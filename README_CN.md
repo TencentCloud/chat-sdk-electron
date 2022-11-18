@@ -1,7 +1,7 @@
 # 腾讯云即时通信IM Electron API
 <img src="https://camo.githubusercontent.com/c1e070dc8b0a68158dbc5fd476a1a35158f5f62fea16964e82beeaa9ee28094b/68747470733a2f2f7765622e73646b2e71636c6f75642e636f6d2f696d2f64656d6f2f6c61746573742f696d672f6c6f676f2e36383066393833332e737667" width="365" height="182" data-canonical-src="https://web.sdk.qcloud.com/im/demo/latest/img/logo.680f9833.svg" style="max-width: 100%;">
 
-更多语言 ：[English](./readme.md) | 简体中文
+更多语言 ：[English](./README.md) | 简体中文
 
 ## 关于腾讯云即时通信
 腾讯云即时通信提供全球互联的聊天API、多平台SDK和UIKit组件，帮助您快速将一对一聊天、群聊、聊天室、系统通知等消息传递能力带入您的应用和网站。
