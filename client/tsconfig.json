@@ -1,0 +1,7 @@
+{
+    // "compilerOptions": {
+    //     "allowJs": true,
+    //     "types": ["../im_electron_sdk/dist/enumbers.d.ts"]
+    // },
+    // "references": ["../im_electron_sdk/dist/enumbers.ts"]
+}
