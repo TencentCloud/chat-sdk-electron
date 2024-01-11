@@ -296,7 +296,7 @@ typedef void (*TIMMsgExtensionsChangedCallback)(const char* message_id, const ch
 
 
 /**
-* @brief 消息扩展信息更新回调
+* @brief 消息扩展信息删除回调
 *
 * @param message_id 消息 ID
 * @param message_extension_key_array 扩展信息的关键字列表
@@ -406,14 +406,14 @@ typedef void (*TIMGroupTipsEventCallback)(const char* json_group_tip, const void
 /**
 * @brief 群属性变更回调
 *
-* @param json_group_attibute_array 变更的群属性列表
+* @param json_group_attribute_array 变更的群属性列表
 * @param user_data ImSDK负责透传的用户自定义数据，未做任何处理
 *
 * @example
-* json_group_attibute_array 的示例。 json key 请参考[GroupAttributes](TIMCloudDef.h)
-* [{"group_atrribute_key":"atrribute_key1","group_atrribute_value":"atrribute_value1"}]
+* json_group_attribute_array 的示例。 json key 请参考[GroupAttributes](TIMCloudDef.h)
+* [{"group_attribute_key":"attribute_key1","group_attribute_value":"attribute_value1"}]
 */
-typedef void (*TIMGroupAttributeChangedCallback)(const char *group_id, const char* json_group_attibute_array, const void* user_data);
+typedef void (*TIMGroupAttributeChangedCallback)(const char *group_id, const char* json_group_attribute_array, const void* user_data);
 
 /**
 * 群计数器变更的回调
@@ -780,7 +780,7 @@ typedef void(*TIMFriendApplicationListReadCallback)(const void* user_data);
 *       "user_profile_role": 4000,
 *       "user_profile_self_signature": "1111111"
 *   }
-*}]
+* }]
 */
 typedef void(*TIMFriendBlackListAddedCallback)(const char* json_friend_black_added_array, const void* user_data);
 

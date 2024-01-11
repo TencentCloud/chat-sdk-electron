@@ -314,13 +314,14 @@ interface MsgFindMessagesParams {
 /**
  * @param conv_id   conv_id 会话的ID
  * @param conv_type conv_type  会话类型，请参考[TIMConvType](../enums/enum.timconvtype.html)
- * @param message_id   message_id 消息ID
+ * @param json_msg_param   消息
  * @param user_data user_data 用户自定义数据，ImSDK只负责传回给回调函数cb，不做任何处理
  *  */
 interface MsgReportReadedParams {
     conv_id: string;
     conv_type: number;
-    message_id?: string;
+    // message_id?: string;
+    json_msg_param: Json_value_msg;
     user_data?: string;
 }
 /**
@@ -332,7 +333,8 @@ interface MsgReportReadedParams {
 interface MsgRevokeParams {
     conv_id: string;
     conv_type: number;
-    message_id: string;
+    // message_id: string;
+    json_msg_param: Json_value_msg;
     user_data?: string;
 }
 /**
@@ -408,7 +410,7 @@ interface MsgDeleteParams {
 interface MsgListDeleteParams {
     conv_id: string;
     conv_type: number;
-    params: string[];
+    params: Json_value_msg[];
     user_data?: string;
 }
 /**
@@ -466,6 +468,7 @@ interface MsgSetGroupReceiveMessageOptParams {
 interface MsgDownloadElemToPathParams {
     params: Json_download_elem_param;
     path: string;
+    callback: TIMMsgDownloadElemToPathFunc;
     user_data?: string;
 }
 /**
@@ -535,6 +538,7 @@ interface MsgModifyMessageParams {
  * @param message_sender_profile message_sender_profile 读写(选填), 消息的发送者的用户资料
  * @param message_sender_group_member_info message_sender_group_member_info 读写(选填), 消息发送者在群里面的信息，只有在群会话有效。目前仅能获取字段 kTIMGroupMemberInfoIdentifier、kTIMGroupMemberInfoNameCard 其他的字段建议通过 TIMGroupGetMemberInfoList 接口获取
  * @param message_offlie_push_config message_offlie_push_config [OfflinePushConfig](), 读写(选填), 消息的离线推送设置
+ * @param message_excluded_from_content_moderation 是否不过内容审核（包含【本地审核】和【云端审核】），只有在开通【本地审核】或【云端审核】功能后，该字段设置才有效，设置为 true，表明不过内容审核，设置为 false：表明过内容审核。【本地审核】开通流程请参考 [本地审核功能](https://cloud.tencent.com/document/product/269/83795#.E6.9C.AC.E5.9C.B0.E5.AE.A1.E6.A0.B8.E5.8A.9F.E8.83.BD)。 【云端审核】开通流程请参考 [云端审核功能](https://cloud.tencent.com/document/product/269/83795#.E4.BA.91.E7.AB.AF.E5.AE.A1.E6.A0.B8.E5.8A.9F.E8.83.BD)
  *
  * @note 注意
  * > 关于对应Elem的顺序
@@ -590,7 +594,7 @@ interface Json_value_msg {
     message_sender_profile?: userProfile;
     message_sender_group_member_info?: GroupMemberInfo;
     message_support_message_extension?: boolean;
-    message_offlie_push_config?: OfflinePushConfig;
+    message_offline_push_config?: OfflinePushConfig;
     message_need_read_receipt?: boolean;
     message_receipt_peer_read?: boolean;
     message_is_broadcast_message?: boolean;
@@ -599,6 +603,7 @@ interface Json_value_msg {
     message_group_receipt_unread_count?: number;
     message_version?: number;
     message_excluded_from_last_message?: boolean;
+    message_excluded_from_content_moderation?: boolean;
     message_target_group_member_array?: string[];
     message_revoker_user_id?: string;
 }
@@ -638,7 +643,8 @@ interface IOSOfflinePushConfig {
  * @param android_offline_push_config_title 读写, 通知标题
  * @param android_offline_push_config_sound 读写, 离线推送声音设置（仅对 Android 生效）。只有华为和谷歌手机支持设置声音提示，小米手机设置声音提示，请您参照：https://dev.mi.com/console/doc/detail?pId=1278%23_3_0。AndroidSound: Android 工程里 raw 目录中的铃声文件名，不需要后缀名。
  * @param android_offline_push_config_notify_mode   [TIMAndroidOfflinePushNotifyMode](), 读写, 当前消息的通知模式
- * @param android_offline_push_config_vivo_classification   读写，离线推送设置 VIVO 手机 （仅对 Android 生效），VIVO 手机离线推送消息分类，0：运营消息，1：系统消息。默认取值为 1 。
+ * @param android_offline_push_config_vivo_classification   读写，离线推送设置 VIVO 推送消息分类 (待废弃接口，VIVO 推送服务于 2023 年 4 月 3 日优化消息分类规则，推荐使用 kTIMAndroidOfflinePushConfigVIVOCategory 设置消息类别) ，VIVO 手机离线推送消息分类，0：运营消息，1：系统消息。默认取值为 1 。
+ * @param android_offline_push_config_vivo_category 读写, 离线推送设置 VIVO 推送消息类别，详见：https://dev.vivo.com.cn/documentCenter/doc/359。(VIVO 推送服务于 2023 年 4 月 3 日优化消息分类规则，推荐使用 kTIMAndroidOfflinePushConfigVIVOCategory 设置消息类别，不需要再关注和设置 kTIMAndroidOfflinePushConfigVIVOClassification)
  * @param android_offline_push_config_oppo_channel_id   读写, 离线推送设置 OPPO 手机 8.0 系统及以上的渠道 ID（仅对 Android 生效）。
  */
 interface AndroidOfflinePushConfig {
@@ -646,6 +652,7 @@ interface AndroidOfflinePushConfig {
     android_offline_push_config_sound: string;
     android_offline_push_config_notify_mode: TIMAndroidOfflinePushNotifyMode;
     android_offline_push_config_vivo_classification?: number;
+    android_offline_push_config_vivo_category?: string;
     android_offline_push_config_oppo_channel_id?: string;
 }
 
@@ -676,21 +683,21 @@ interface Json_msg_locator {
  * @param msg_download_elem_param_url msg_download_elem_param_url 只写, 从消息元素里面取出来,元素URL
  */
 interface Json_download_elem_param {
-    msg_download_elem_param_flag: number;
-    msg_download_elem_param_type: TIMDownloadType;
+    msg_download_elem_param_flag?: number;
+    msg_download_elem_param_type?: TIMDownloadType;
     msg_download_elem_param_id: string;
-    msg_download_elem_param_business_id: number;
+    msg_download_elem_param_business_id?: number;
     msg_download_elem_param_url: string;
 }
 
 /**
  *  @brief  消息删除接口的参数
  *  @param msg_delete_param_msg msg_delete_param_msg： object [Message](), 只写(选填), 指定在会话中要删除的消息
- *  @param  msg_delete_param_is_remble msg_delete_param_is_remble bool, 只写(选填), 是否删除本地/漫游所有消息。true删除漫游消息，false删除本地消息，默认值false
+ *  @param  msg_delete_param_is_ramble msg_delete_param_is_ramble bool, 只写(选填), 是否删除本地/漫游所有消息。true删除漫游消息，false删除本地消息，默认值false
  */
 interface Json_value_msgdelete {
-    msg_delete_param_msg: string;
-    msg_delete_param_is_remble?: boolean;
+    msg_delete_param_msg: Json_value_msg;
+    msg_delete_param_is_ramble?: boolean;
 }
 
 interface Json_value_batchsend {
@@ -722,13 +729,13 @@ interface Json_search_message_param {
     msg_search_param_page_index?: number;
     msg_search_param_page_size?: number;
     msg_search_param_keyword_list_match_type?: number;
-    msg_search_param_send_indentifier_array?: string[];
+    msg_search_param_send_identifier_array?: string[];
 }
 /**
  * @brief 消息获取接口的参数
  * @param msg_getmsglist_param_last_msg msg_getmsglist_param_last_msg:[Message](), 只写(选填), 指定的消息，不允许为null
  * @param msg_getmsglist_param_count msg_getmsglist_param_count: 只写(选填), 从指定消息往后的消息数
- * @param msg_getmsglist_param_is_remble msg_getmsglist_param_is_remble:只写(选填), 是否漫游消息
+ * @param msg_getmsglist_param_is_ramble msg_getmsglist_param_is_ramble:只写(选填), 是否漫游消息
  * @param msg_getmsglist_param_is_forward msg_getmsglist_param_is_forward:只写(选填), 是否向前排序
  * @param msg_getmsglist_param_last_msg_seq msg_getmsglist_param_last_msg_seq:只写(选填), 指定的消息的 seq
  * @param msg_getmsglist_param_time_begin msg_getmsglist_param_time_begin:只写(选填), 开始时间；UTC 时间戳， 单位：秒
@@ -737,7 +744,7 @@ interface Json_search_message_param {
 interface Json_get_msg_param {
     msg_getmsglist_param_last_msg?: Json_value_msg;
     msg_getmsglist_param_count?: number;
-    msg_getmsglist_param_is_remble?: boolean;
+    msg_getmsglist_param_is_ramble?: boolean;
     msg_getmsglist_param_is_forward?: boolean;
     msg_getmsglist_param_last_msg_seq?: number;
     msg_getmsglist_param_time_begin?: number;
@@ -797,6 +804,12 @@ interface TIMMsgUpdateCallbackParams {
  */
 interface TIMRecvNewMsgCallbackFunc {
     (json_msg_array: string, user_data: string): void;
+}
+/**
+ * 多媒体消息下载回调
+ */
+interface TIMMsgDownloadElemToPathFunc {
+    (code: number, desc: string, json_param: string, user_data: string): void;
 }
 /**
  * @param json_msg_readed_receipt_array json_msg_readed_receipt_array：消息已读回执数组
@@ -917,7 +930,7 @@ interface MessageSearchResultItem {
     msg_search_result_item_conv_id: string;
     msg_search_result_item_conv_type: TIMConvType;
     msg_search_result_item_total_message_count: number;
-    msg_search_result_item_message_array: Json_value_msg;
+    msg_search_result_item_message_array: Json_value_msg[];
 }
 
 interface MessageSearchResult {
@@ -1000,6 +1013,23 @@ interface OfflinePushToken {
     user_data: string;
 }
 
+interface TranslateTextParam {
+    json_source_text_array: string[];
+    source_language: string;
+    target_language: string;
+    user_data?: string;
+}
+interface MessageTranslateTextResult {
+    msg_translate_text_source_text: string;
+    msg_translate_text_target_text: string;
+}
+
+interface ConvertVoiceToTextParam {
+    url: string;
+    language: string;
+    user_data?: string;
+}
+
 export {
     TIMMsgDeleteMessageExtensionsParam,
     TIMMsgGetMessageExtensionsParam,
@@ -1046,6 +1076,9 @@ export {
     BatchSendResult,
     MessageSearchResult,
     OfflinePushToken,
+    TranslateTextParam,
+    ConvertVoiceToTextParam,
+    MessageTranslateTextResult,
     // 文档需要导出，外部不使用这些inreface
     ImageElem,
     TextElem,
@@ -1064,4 +1097,6 @@ export {
     TIMSetMsgExtensionsChangedCallbackParam,
     MessageExtensionResult,
     MessageExtension,
+    TIMMsgDownloadElemToPathFunc,
+    OfflinePushConfig,
 };

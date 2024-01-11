@@ -1,6 +1,8 @@
 import TimRender from "../../../im_electron_sdk/dist/renderer";
-import {callExperimentalAPIParam, loginParam, logoutParam, signalCallback, TIMProfileGetUserProfileListParam, TIMProfileModifySelfUserProfileParam, TIMSetKickedOfflineCallbackParam, TIMSetNetworkStatusListenerCallbackParam, TIMSetUserSigExpiredCallbackParam, TRTCCallingCallGroupParam, TRTCCallingCallParam} from "../../../im_electron_sdk/dist/interfaces";
+import {callExperimentalAPIParam, inviteParam, loginParam, logoutParam, setSelfStatusParam, SetSignalingInvitationCancelledCallbackParam, SetSignalingInvitationTimeoutCallParam, SetSignalingInviteeAcceptedCallbackParam, SetSignalingInviteeRejectedCallbackParam, SetSignalingReceiveNewInvitationCallbackParam, signalCallback, TIMProfileGetUserProfileListParam, TIMProfileModifySelfUserProfileParam, TIMSetKickedOfflineCallbackParam, TIMSetNetworkStatusListenerCallbackParam, TIMSetSelfInfoUpdatedCallbackParam, TIMSetUserSigExpiredCallbackParam, TIMSetUserStatusChangedCallbackParam, TRTCCallingCallGroupParam, TRTCCallingCallParam, userStatusParam} from "../../../im_electron_sdk/dist/interfaces";
 import {TIMInternalOperation} from "./../../../im_electron_sdk/dist/enumbers";
+const path = require('path')
+const os = require('os')
 // import TimRender from "im_electron_sdk/dist/renderer";
 const timRenderInstance = new TimRender();
 const TimBaseManager = {
@@ -31,9 +33,11 @@ const TimBaseManager = {
         return timRenderInstance.callExperimentalAPI(obj);
     },
     TIMInit: () => {
-        return timRenderInstance.TIMInit();
+        return timRenderInstance.TIMInit({
+        });
     },
     TIMLogin: () => {
+        console.log(path.resolve(os.homedir(), ".tencent-im/sdk-log"));
         let obj :loginParam = {
             userID:"",
             userSig: "",
@@ -48,62 +52,76 @@ const TimBaseManager = {
         return timRenderInstance.TIMLogin(obj);
         
     },
+    TIMSetSelfInfoUpdatedCallback:()=>{
+        let obj:TIMSetSelfInfoUpdatedCallbackParam = {
+            callback:function(data){console.log("setselfInfoupdated");console.log(data)},
+            user_data:"selfinfoupdate"
+        }
+        return timRenderInstance.TIMSetSelfInfoUpdatedCallback(obj)
+    },
+    TIMSetUserStatusChangedCallback:()=>{
+        let obj:TIMSetUserStatusChangedCallbackParam={
+            callback:function(data){console.log("userstatuschangedcallback");console.log(data)}
+        }
+        return timRenderInstance.TIMSetUserStatusChangedCallback(obj)
+    },
     TIMInvite: () => {
-        let obj:TRTCCallingCallParam = {
-            userID: '121405',
-            senderID: '109442',
-
-            data: JSON.stringify({
-                buisnessID: 'av_call',
-                call_type: 2,
-                room_id: 22334,
-            }),
-            timeout:0,
+        let obj:inviteParam = {
+            invitee: "10058198",
+            data: "",
+            online_user_only: false,
+            json_offline_push_info: undefined,
+            timeout: 100
         }
         return timRenderInstance.TIMInvite(obj);
     },
     TIMInviteInGroup: () => {
-        let obj:TRTCCallingCallGroupParam = {
-            senderID: '109442',
-            groupID: "@TGS#2WWPGH7HM",
-            userIDs: ['121405'],
-            data: JSON.stringify({
-                buisnessID: 'av_call',
-                call_type: 2,
-                room_id: 22334,
-            }),
-        }
-        return timRenderInstance.TIMInviteInGroup(obj).then((data) => {
-            const inviteID = JSON.parse(JSON.parse(data as string)[0].message_elem_array[0].custom_elem_data).inviteID;
-        })
+        // let obj:TRTCCallingCallGroupParam = {
+        //     senderID: '',
+        //     groupID: "",
+        //     userIDs: [''],
+        //     data: JSON.stringify({
+        //         buisnessID: 'av_call',
+        //         call_type: 2,
+        //         room_id: 22334,
+        //     }),
+        // }
+        // return timRenderInstance.TIMInviteInGroup(obj).then((data) => {
+        //     const inviteID = JSON.parse(JSON.parse(data as string)[0].message_elem_array[0].custom_elem_data).inviteID;
+        // })
     },
     TIMOnInvited: () => {
-        let obj:signalCallback = {
+        let obj:SetSignalingReceiveNewInvitationCallbackParam = {
             callback: (data) => {
-                const inviteID = JSON.parse(JSON.parse(data)[0].message_elem_array[0].custom_elem_data).inviteID;
+                console.log(data);
             }
         }
         return timRenderInstance.TIMOnInvited(obj);
     },
     TIMOnTimeout: () => {
-        let obj:signalCallback = {callback: (data) => {
+        let obj:SetSignalingInvitationTimeoutCallParam = {callback: (data) => {
+
+            console.log(data);
         }}
         return timRenderInstance.TIMOnTimeout(obj)
     },
     TIMOnRejected: () => {
-        let obj:signalCallback = {callback: (data) => {
+        let obj:SetSignalingInviteeRejectedCallbackParam = {callback: (data) => {
+            console.log(data);
         }}
         return timRenderInstance.TIMOnRejected(obj)
     },
     TIMOnAccepted: () => {
-        let obj:signalCallback = {callback: (data) => {
+        let obj:SetSignalingInviteeAcceptedCallbackParam = {callback: (data) => {
+            console.log(data);
         }}
         return timRenderInstance.TIMOnAccepted(obj)
     },
     TIMOnCanceled: () => {
-        let obj:signalCallback = {callback: (data) => {
+        let obj:SetSignalingInvitationCancelledCallbackParam = {callback: (data) => {
+            console.log(data);
         }}
-        return timRenderInstance.TIMOnCanceled(obj)
+        return timRenderInstance.TIMOnCancelled(obj)
     },
     TIMUninit: () => {
         return timRenderInstance.TIMUninit()
@@ -130,6 +148,7 @@ const TimBaseManager = {
         let obj:TIMSetNetworkStatusListenerCallbackParam={
             userData: "setNetworkStatusListenerCallback",
             callback: (data) => {
+                console.log(data);
             }
         };
         return timRenderInstance.TIMSetNetworkStatusListenerCallback(obj)
@@ -168,6 +187,36 @@ const TimBaseManager = {
             user_data: "TIMProfileModifySelfUserProfile",
         }
         return timRenderInstance.TIMProfileModifySelfUserProfile(obj)
+    },
+    TIMGetUserStatus:() => {
+        let obj:userStatusParam = {
+            id_array:[""],
+            user_data:"getuserstatus"
+        }
+        return timRenderInstance.TIMGetUserStatus(obj)
+    },
+    TIMSetSelfStatus:()=>{
+        let obj:setSelfStatusParam = {
+            status:{
+                user_status_custom_status:"hello"
+            },
+            user_data:"setselfstatus"
+        }
+        return timRenderInstance.TIMSetSelfStatus(obj)
+    },
+    TIMSubscribeUserStatus:()=>{
+        let obj:userStatusParam = {
+            id_array:[""],
+            user_data:"subscribe"
+        }
+        return timRenderInstance.TIMSubscribeUserStatus(obj)
+    },
+    TIMUnsubscribeUserStatus:()=>{
+        let obj:userStatusParam = {
+            id_array:[""],
+            user_data:"unsubscribe"
+        }
+        return timRenderInstance.TIMUnsubscribeUserStatus(obj)
     }
 }
 

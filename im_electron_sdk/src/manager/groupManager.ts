@@ -7,14 +7,10 @@
  * @module GroupManager(群组相关接口)
  */
 import {
-    sdkconfig,
-    libMethods,
     CreateGroupParams,
     DeleteGroupParams,
     JoinGroupParams,
     QuitGroupParams,
-    CommonCallbackFun,
-    commonResponse,
     InviteMemberParams,
     DeleteMemberParams,
     GetGroupListParams,
@@ -29,17 +25,12 @@ import {
     SearchMemberParams,
     InitGroupAttributeParams,
     DeleteAttributeParams,
-    ErrorResponse,
     GroupTipsCallbackParams,
     GroupAttributeCallbackParams,
-    cache,
     MsgSendGroupMessageReceiptsParam,
     MsgGetGroupMessageReceiptsParam,
     MsgGetGroupMessageReadMembersParam,
-    MsgGroupMessageReceiptCallbackParam,
-    GroupReadMembersCallback,
     commonResult,
-    GroupParams,
     DeleteMemberResult,
     GroupBaseInfo,
     GroupInfoResult,
@@ -47,47 +38,43 @@ import {
     GetMemberInfoResult,
     GroupPendencyResult,
     GetOnlineMemberCountResult,
-    GroupDetailInfo,
     SearchMemberResult,
     MessageReceipt,
     GroupMemberInfo,
     GroupAttributes,
     CreateGroupResult,
     MsgGetGroupMessageReadMemberListResult,
+    GroupCounterParams,
+    GroupCounter,
+    IncreaseGroupCounterParam,
+    GetGroupCounterParams,
+    GetCommunityListParam,
+    CreateTopicParam,
+    DeleteTopicParam,
+    TopicOperationResult,
+    SetTopicInfoParam,
+    GroupTopicInfoResult,
+    GroupCounterChangedParam,
+    TopicCreatedParam,
+    TopicDeletedParam,
+    TopicChangedParam,
+    sdkconfig,
 } from "../interface";
-// import log from "../utils/log";
-import {
-    nodeStrigToCString,
-    jsFuncToFFIFun,
-    transformGroupTipFun,
-    transformGroupAttributeFun,
-    randomString,
-    jsFuncToFFIFunForGroupRead,
-} from "../utils/utils";
-const log = {
-    info: function (...args: any) {},
-    error: function (...args: any) {},
-};
+
+const { load, DataType, funcConstructor } = require("ffi-rs");
+
+const libName = "libImSDK";
+
 class GroupManager {
-    private _imskdLib: libMethods;
-    private _callback: Map<String, Function> = new Map();
-    private _ffiCallback: Map<String, Buffer> = new Map();
-    private _cache: Map<String, Map<string, cache>> = new Map();
-    /** @internal */
-    constructor(config: sdkconfig) {
-        this._imskdLib = config.Imsdklib;
+    private _sdkconfig: sdkconfig;
+
+    setSDKAPPID(sdkappid: number) {
+        this._sdkconfig.sdkappid = sdkappid;
     }
 
-    private stringFormator = (str: string | undefined): string =>
-        str ? nodeStrigToCString(str) : nodeStrigToCString("");
-
-    private getErrorResponse(params: ErrorResponse) {
-        return {
-            code: params.code || -1,
-            desc: params.desc || "error",
-            json_params: params.json_params || "",
-            user_data: params.user_data || "",
-        };
+    /** @internal */
+    constructor(config: sdkconfig) {
+        this._sdkconfig = config;
     }
 
     /**
@@ -102,48 +89,53 @@ class GroupManager {
     TIMGroupCreate(
         createGroupParams: CreateGroupParams
     ): Promise<commonResult<CreateGroupResult>> {
-        const { params, data } = createGroupParams;
-        const paramsForCString = nodeStrigToCString(JSON.stringify(params));
-        const userData = this.stringFormator(data);
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: CreateGroupResult;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify({})
-                    );
-                } catch {
-                    param = {} as CreateGroupResult;
-                }
-                code === 0
-                    ? resolve({ code, desc, json_param: param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupCreate")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupCreate");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupCreate",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(createGroupParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: CreateGroupResult;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as CreateGroupResult;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    createGroupParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupCreate", cacheMap);
-            const code = this._imskdLib.TIMGroupCreate(
-                paramsForCString,
-                this._cache.get("TIMGroupCreate")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -162,40 +154,38 @@ class GroupManager {
     TIMGroupDelete(
         deleteParams: DeleteGroupParams
     ): Promise<commonResult<string>> {
-        const { groupId, data } = deleteParams;
-        const groupID = nodeStrigToCString(groupId);
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupDelete")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-
-            let cacheMap = this._cache.get("TIMGroupDelete");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupDelete",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    deleteParams.groupId,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    deleteParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupDelete", cacheMap);
-            const code = this._imskdLib.TIMGroupDelete(
-                groupID,
-                this._cache.get("TIMGroupDelete")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -214,41 +204,40 @@ class GroupManager {
     TIMGroupJoin(
         joinGroupParams: JoinGroupParams
     ): Promise<commonResult<string>> {
-        const { groupId, helloMsg, data } = joinGroupParams;
-        const groupID = nodeStrigToCString(groupId);
-        const userData = this.stringFormator(data);
-        const msg = this.stringFormator(helloMsg);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupJoin")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupJoin");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupJoin",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    joinGroupParams.groupId,
+                    joinGroupParams.helloMsg ?? "",
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    joinGroupParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupJoin", cacheMap);
-            const code = this._imskdLib.TIMGroupJoin(
-                groupID,
-                msg,
-                this._cache.get("TIMGroupJoin")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -268,39 +257,38 @@ class GroupManager {
     TIMGroupQuit(
         quitGroupParams: QuitGroupParams
     ): Promise<commonResult<string>> {
-        const { groupId, data } = quitGroupParams;
-        const groupID = nodeStrigToCString(groupId);
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupQuit")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupQuit");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupQuit",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    quitGroupParams.groupId,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    quitGroupParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupQuit", cacheMap);
-            const code = this._imskdLib.TIMGroupQuit(
-                groupID,
-                this._cache.get("TIMGroupQuit")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -313,38 +301,38 @@ class GroupManager {
     TIMGroupInviteMember(
         inviteMemberParams: InviteMemberParams
     ): Promise<commonResult<string>> {
-        const { params, data } = inviteMemberParams;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupInviteMember")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupInviteMember");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupInviteMember",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(inviteMemberParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    inviteMemberParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupInviteMember", cacheMap);
-            const code = this._imskdLib.TIMGroupInviteMember(
-                nodeStrigToCString(JSON.stringify(params)),
-                this._cache.get("TIMGroupInviteMember")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -361,48 +349,53 @@ class GroupManager {
     TIMGroupDeleteMember(
         deleteMemberParams: DeleteMemberParams
     ): Promise<commonResult<DeleteMemberResult>> {
-        const { params, data } = deleteMemberParams;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: DeleteMemberResult;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify({})
-                    );
-                } catch {
-                    param = {} as DeleteMemberResult;
-                }
-                code === 0
-                    ? resolve({ code, desc, json_param: param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupDeleteMember")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupDeleteMember");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupDeleteMember",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(deleteMemberParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: DeleteMemberResult;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as DeleteMemberResult;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    deleteMemberParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupDeleteMember", cacheMap);
-            const code = this._imskdLib.TIMGroupDeleteMember(
-                nodeStrigToCString(JSON.stringify(params)),
-                this._cache.get("TIMGroupDeleteMember")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -421,47 +414,51 @@ class GroupManager {
     TIMGroupGetJoinedGroupList(
         data?: string
     ): Promise<commonResult<Array<GroupInfo>>> {
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: Array<GroupInfo>;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<GroupInfo>;
-                }
-                code === 0
-                    ? resolve({ code, desc, json_param: param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupGetJoinedGroupList")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupGetJoinedGroupList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupGetJoinedGroupList",
+                retType: DataType.I32,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<GroupInfo>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<GroupInfo>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupGetJoinedGroupList", cacheMap);
-            const code = this._imskdLib.TIMGroupGetJoinedGroupList(
-                this._cache.get("TIMGroupGetJoinedGroupList")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -497,7 +494,7 @@ class GroupManager {
     static const char* kTIMGroupDetialInfoSearchable       = "group_detial_info_searchable";         // uint,   只读, 群组是否能被搜索
     static const char* kTIMGroupDetialInfoIsShutupAll      = "group_detial_info_is_shutup_all";      // bool,   只读, 群组是否被设置了全员禁言
     static const char* kTIMGroupDetialInfoOwnerIdentifier  = "group_detial_info_owener_identifier";  // string, 只读, 群组所有者ID
-    static const char* kTIMGroupDetialInfoCustomInfo       = "group_detial_info_custom_info";        // array [GroupInfoCustemString](), 只读, 请参考[自定义字段](https://cloud.tencent.com/document/product/269/1502#.E8.87.AA.E5.AE.9A.E4.B9.89.E5.AD.97.E6.AE.B5)
+    static const char* kTIMGroupDetialInfoCustomInfo       = "group_detial_info_custom_info";        // array [GroupInfoCustomString](), 只读, 请参考[自定义字段](https://cloud.tencent.com/document/product/269/1502#.E8.87.AA.E5.AE.9A.E4.B9.89.E5.AD.97.E6.AE.B5)
 
     //获取已加入群组列表接口的返回(群组基础信息)
     static const char* kTIMGroupBaseInfoGroupId      = "group_base_info_group_id";       // string, 只读, 群组ID
@@ -515,48 +512,53 @@ class GroupManager {
     TIMGroupGetGroupInfoList(
         getGroupListParams: GetGroupListParams
     ): Promise<commonResult<Array<GroupInfoResult>>> {
-        const { groupIds, data } = getGroupListParams;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: Array<GroupInfoResult>;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<GroupInfoResult>;
-                }
-                code === 0
-                    ? resolve({ code, desc, json_param: param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupGetGroupInfoList")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupGetGroupInfoList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupGetGroupInfoList",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(getGroupListParams.groupIds),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<GroupInfoResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<GroupInfoResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    getGroupListParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupGetGroupInfoList", cacheMap);
-            const code = this._imskdLib.TIMGroupGetGroupInfoList(
-                nodeStrigToCString(JSON.stringify(groupIds)),
-                this._cache.get("TIMGroupGetGroupInfoList")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -577,37 +579,38 @@ class GroupManager {
     TIMGroupModifyGroupInfo(
         modifyGroupParams: ModifyGroupParams
     ): Promise<commonResult<string>> {
-        const { params, data } = modifyGroupParams;
-        const userData = this.stringFormator(data);
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupModifyGroupInfo")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupModifyGroupInfo");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupModifyGroupInfo",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(modifyGroupParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    modifyGroupParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupModifyGroupInfo", cacheMap);
-            const code = this._imskdLib.TIMGroupModifyGroupInfo(
-                nodeStrigToCString(JSON.stringify(params)),
-                this._cache.get("TIMGroupModifyGroupInfo")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -622,51 +625,53 @@ class GroupManager {
     TIMGroupGetMemberInfoList(
         getGroupMemberInfoParams: GetGroupMemberInfoParams
     ): Promise<commonResult<GetMemberInfoResult>> {
-        const { params, data } = getGroupMemberInfoParams;
-
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: GetMemberInfoResult;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify({})
-                    );
-                } catch {
-                    param = {} as GetMemberInfoResult;
-                }
-                code === 0
-                    ? resolve({ code, desc, json_param: param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupGetMemberInfoList")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupGetMemberInfoList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupGetMemberInfoList",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(getGroupMemberInfoParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: GetMemberInfoResult;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as GetMemberInfoResult;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    getGroupMemberInfoParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupGetMemberInfoList", cacheMap);
-            const code = this._imskdLib.TIMGroupGetMemberInfoList(
-                nodeStrigToCString(JSON.stringify(params)),
-                this._cache.get("TIMGroupGetMemberInfoList")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0)
-                reject(this.getErrorResponse({ code, user_data: data }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -683,38 +688,38 @@ class GroupManager {
     TIMGroupModifyMemberInfo(
         modifyMemberInfoParams: ModifyMemberInfoParams
     ): Promise<commonResult<string>> {
-        const { params, data } = modifyMemberInfoParams;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupModifyMemberInfo")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupModifyMemberInfo");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupModifyMemberInfo",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(modifyMemberInfoParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    modifyMemberInfoParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupModifyMemberInfo", cacheMap);
-            const code = this._imskdLib.TIMGroupModifyMemberInfo(
-                nodeStrigToCString(JSON.stringify(params)),
-                this._cache.get("TIMGroupModifyMemberInfo")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -743,48 +748,53 @@ class GroupManager {
     TIMGroupGetPendencyList(
         getPendencyListParams: GetPendencyListParams
     ): Promise<commonResult<GroupPendencyResult>> {
-        const { params, data } = getPendencyListParams;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: GroupPendencyResult;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify({})
-                    );
-                } catch {
-                    param = {} as GroupPendencyResult;
-                }
-                code === 0
-                    ? resolve({ code, desc, json_param: param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupGetPendencyList")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupGetPendencyList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupGetPendencyList",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(getPendencyListParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: GroupPendencyResult;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as GroupPendencyResult;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    getPendencyListParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupGetPendencyList", cacheMap);
-            const code = this._imskdLib.TIMGroupGetPendencyList(
-                nodeStrigToCString(JSON.stringify(params)),
-                this._cache.get("TIMGroupGetPendencyList")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -799,42 +809,38 @@ class GroupManager {
     TIMGroupReportPendencyReaded(
         reportParams: ReportParams
     ): Promise<commonResult<string>> {
-        const { timeStamp, data } = reportParams;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                log.info(`delete TIMGroupReportPendencyReaded Func ${now}`);
-                this._cache.get("TIMGroupReportPendencyReaded")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupReportPendencyReaded");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupReportPendencyReaded",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.I64,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    reportParams.timeStamp,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    reportParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupReportPendencyReaded", cacheMap);
-            log.info(`set TIMGroupReportPendencyReaded Func ${now}`);
-            log.info(`TIMGroupReportPendencyReaded ${callback}`);
-            const code = this._imskdLib.TIMGroupReportPendencyReaded(
-                timeStamp,
-                this._cache.get("TIMGroupReportPendencyReaded")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -852,38 +858,38 @@ class GroupManager {
     TIMGroupHandlePendency(
         handlePendencyParams: HandlePendencyParams
     ): Promise<commonResult<string>> {
-        const { params, data } = handlePendencyParams;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupHandlePendency")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupHandlePendency");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupHandlePendency",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(handlePendencyParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    handlePendencyParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupHandlePendency", cacheMap);
-            const code = this._imskdLib.TIMGroupHandlePendency(
-                nodeStrigToCString(JSON.stringify(params)),
-                this._cache.get("TIMGroupHandlePendency")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -899,52 +905,301 @@ class GroupManager {
     TIMGroupGetOnlineMemberCount(
         params: GetOnlineMemberCountParams
     ): Promise<commonResult<GetOnlineMemberCountResult>> {
-        const { groupId, data } = params;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: GetOnlineMemberCountResult;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify({})
-                    );
-                } catch {
-                    param = {} as GetOnlineMemberCountResult;
-                }
-                code === 0
-                    ? resolve({ code, desc, json_param: param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupGetOnlineMemberCount")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupGetOnlineMemberCount");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupGetOnlineMemberCount",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    params.groupId,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: GetOnlineMemberCountResult;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as GetOnlineMemberCountResult;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    params.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupGetOnlineMemberCount", cacheMap);
-            const code = this._imskdLib.TIMGroupGetOnlineMemberCount(
-                nodeStrigToCString(groupId),
-                this._cache.get("TIMGroupGetOnlineMemberCount")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
-
+    /**
+     * @brief 设置群计数器
+     * @note
+     * - 该计数器的 key 如果存在，则直接更新计数器的 value 值；如果不存在，则添加该计数器的 key-value；
+     * - 当群计数器设置成功后，在回调 cb 中会返回最终成功设置的群计数器信息；
+     * - 除了社群和话题，群计数器支持所有的群组类型。
+     */
+    TIMGroupSetGroupCounters(
+        setGroupCountersParam: GroupCounterParams
+    ): Promise<commonResult<Array<GroupCounter>>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupSetGroupCounters",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    setGroupCountersParam.params.group_id,
+                    JSON.stringify(
+                        setGroupCountersParam.params.json_group_counter_array
+                    ),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<GroupCounter>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = [] as Array<GroupCounter>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    setGroupCountersParam.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+    /**
+     * @brief 获取群计数器
+     */
+    TIMGroupGetGroupCounters(
+        getGroupCountersParam: GetGroupCounterParams
+    ): Promise<commonResult<Array<GroupCounter>>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupSetGroupCounters",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    getGroupCountersParam.group_id,
+                    JSON.stringify(
+                        getGroupCountersParam.json_group_counter_key_array
+                    ),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<GroupCounter>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = [] as Array<GroupCounter>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    getGroupCountersParam.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+    /**
+     * @brief 递增群计数器
+     * @note
+     * - 该计数器的 key 如果存在，则直接在当前值的基础上根据传入的 group_counter_value 作递增操作；反之，添加 key，并在默认值为 0 的基础上根据传入的 group_counter_value 作递增操作；
+     * - 除了社群和话题，群计数器支持所有的群组类型。
+     */
+    TIMGroupIncreaseGroupCounter(
+        increaseParam: IncreaseGroupCounterParam
+    ): Promise<commonResult<Array<GroupCounter>>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupIncreaseGroupCounter",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    DataType.I64,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    increaseParam.group_id,
+                    increaseParam.group_counter_key,
+                    increaseParam.group_counter_value,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<GroupCounter>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = [] as Array<GroupCounter>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    increaseParam.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+    /**
+     * @brief 递减群计数器
+     * @note
+     * - 该计数器的 key 如果存在，则直接在当前值的基础上根据传入的 group_counter_value 作递减操作；反之，添加 key，并在默认值为 0 的基础上根据传入的 group_counter_value 作递减操作
+     * - 除了社群和话题，群计数器支持所有的群组类型。
+     */
+    TIMGroupDecreaseGroupCounter(
+        increaseParam: IncreaseGroupCounterParam
+    ): Promise<commonResult<Array<GroupCounter>>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupDecreaseGroupCounter",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    DataType.I64,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    increaseParam.group_id,
+                    increaseParam.group_counter_key,
+                    increaseParam.group_counter_value,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<GroupCounter>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = [] as Array<GroupCounter>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    increaseParam.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
     /**
      * @brief 搜索群列表
      *
@@ -957,48 +1212,53 @@ class GroupManager {
     TIMGroupSearchGroups(
         searchGroupsParams: SearchGroupParams
     ): Promise<commonResult<Array<GroupInfo>>> {
-        const { searchParams, data } = searchGroupsParams;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: Array<GroupInfo>;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<GroupInfo>;
-                }
-                code === 0
-                    ? resolve({ code, desc, json_param: param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupSearchGroups")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupSearchGroups");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupSearchGroups",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    searchGroupsParams.searchParams,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<GroupInfo>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<GroupInfo>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    searchGroupsParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupSearchGroups", cacheMap);
-            const code = this._imskdLib.TIMGroupSearchGroups(
-                nodeStrigToCString(JSON.stringify(searchParams)),
-                this._cache.get("TIMGroupSearchGroups")?.get(now)?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -1013,54 +1273,66 @@ class GroupManager {
     TIMGroupSearchGroupMembers(
         searchMemberParams: SearchMemberParams
     ): Promise<commonResult<Array<SearchMemberResult>>> {
-        const { searchParams, data } = searchMemberParams;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: Array<SearchMemberResult>;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<SearchMemberResult>;
-                }
-                code === 0
-                    ? resolve({ code, desc, json_param: param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupSearchGroupMembers")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupSearchGroupMembers");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupSearchGroupMembers",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    searchMemberParams.searchParams,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<SearchMemberResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<SearchMemberResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    searchMemberParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupSearchGroupMembers", cacheMap);
-            const code = this._imskdLib.TIMGroupSearchGroupMembers(
-                nodeStrigToCString(JSON.stringify(searchParams)),
-                this._cache.get("TIMGroupSearchGroupMembers")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
     /**
      * @brief 初始化群属性，会清空原有的群属性列表
+     * @note 从7.0版本开始，出了话题外，群属性支持所有的群类型；
+     * - key 最多支持16个，长度限制为32字节
+     * - value 长度限制为4k
+     * - 总的 attributes（包括 key 和 value）限制为 16k
+     * - initGroupAttributes、setGroupAttributes、deleteGroupAttributes 接口合并计算， SDK 限制为 5 秒 10 次，超过后回调 8511 错误码；后台限制 1 秒 5 次，超过后返回 10049 错误码；
+     * - getGroupAttributes 接口 SDK 限制 5 秒 20 次；
+     * - 当每次APP启动后初次修改群属性时，请您先调用 getGroupAttributes 拉取到最新的群属性之后，再发起修改操作；
+     * - 当多个用户同时修改同一个群属性时，只有第一个用户可以执行成功，其它用户会收到 10056 错误码；收到这个错误码之后，请您调用 getGroupAttributes 把本地保存的群属性更新到最新之后，再发起修改操作。
      * @category 群属性相关接口
      * @param InitGroupAttributeParams
      * @return {Promise<commonResponse>}
@@ -1068,204 +1340,187 @@ class GroupManager {
     TIMGroupInitGroupAttributes(
         initAttributesParams: InitGroupAttributeParams
     ): Promise<commonResult<string>> {
-        const { groupId, attributes, data } = initAttributesParams;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupInitGroupAttributes")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupInitGroupAttributes");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupInitGroupAttributes",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    initAttributesParams.groupId,
+                    JSON.stringify(initAttributesParams.attributes),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    initAttributesParams.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupInitGroupAttributes", cacheMap);
-            const code = this._imskdLib.TIMGroupInitGroupAttributes(
-                nodeStrigToCString(groupId),
-                nodeStrigToCString(JSON.stringify(attributes)),
-                this._cache.get("TIMGroupInitGroupAttributes")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     TIMMsgSendMessageReadReceipts(
         msgSendGroupMessageReceipts: MsgSendGroupMessageReceiptsParam
     ): Promise<commonResult<string>> {
-        const { json_msg_array, user_data } = msgSendGroupMessageReceipts;
-        const userData = this.stringFormator(user_data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMMsgSendMessageReadReceipts")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMMsgSendMessageReadReceipts");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMMsgSendMessageReadReceipts",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    msgSendGroupMessageReceipts.json_msg_array,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    msgSendGroupMessageReceipts.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMMsgSendMessageReadReceipts", cacheMap);
-            const code = this._imskdLib.TIMMsgSendMessageReadReceipts(
-                nodeStrigToCString(json_msg_array),
-                this._cache.get("TIMMsgSendMessageReadReceipts")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     TIMMsgGetMessageReadReceipts(
         msgGetGroupMessageReceipts: MsgGetGroupMessageReceiptsParam
     ): Promise<commonResult<Array<MessageReceipt>>> {
-        const { json_msg_array, user_data } = msgGetGroupMessageReceipts;
-        const userData = this.stringFormator(user_data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: Array<MessageReceipt>;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<MessageReceipt>;
-                }
-                code === 0
-                    ? resolve({ code, desc, json_param: param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMMsgGetMessageReadReceipts")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMMsgGetMessageReadReceipts");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMMsgGetMessageReadReceipts",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    msgGetGroupMessageReceipts.json_msg_array,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    msgGetGroupMessageReceipts.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMMsgGetMessageReadReceipts", cacheMap);
-            const code = this._imskdLib.TIMMsgGetMessageReadReceipts(
-                this.stringFormator(json_msg_array),
-                this._cache.get("TIMMsgGetMessageReadReceipts")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     TIMMsgGetGroupMessageReadMemberList(
         msgGetGroupMessageReadMembers: MsgGetGroupMessageReadMembersParam
     ): Promise<commonResult<MsgGetGroupMessageReadMemberListResult>> {
-        const { json_msg, user_data, filter, next_seq, count } =
-            msgGetGroupMessageReadMembers;
-        const userData = this.stringFormator(user_data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: GroupReadMembersCallback = (
-                json_group_member_array,
-                next_seq,
-                is_finished,
-                user_data
-            ) => {
-                let param: Array<GroupMemberInfo> =
-                    json_group_member_array == ""
-                        ? []
-                        : JSON.parse(json_group_member_array);
-                try {
-                    param = JSON.parse(
-                        json_group_member_array.trim().length > 0
-                            ? json_group_member_array.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<GroupMemberInfo>;
-                }
-                let result: MsgGetGroupMessageReadMemberListResult = {
-                    next_seq: next_seq,
-                    is_finished: is_finished,
-                    json_param: param,
-                };
-                resolve({
-                    code: 0,
-                    desc: "",
-                    json_param: result,
-                    // json_param: JSON.stringify({
-                    //     json_group_member_array,
-                    //     next_seq,
-                    //     is_finished,
-                    // }),
-                    user_data,
-                });
-                this._cache
-                    .get("TIMMsgGetGroupMessageReadMemberList")
-                    ?.delete(now);
-            };
-            const callback = jsFuncToFFIFunForGroupRead(successCallback);
-            let cacheMap = this._cache.get(
-                "TIMMsgGetGroupMessageReadMemberList"
-            );
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMMsgGetGroupMessageReadMemberList",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.I32,
+                    DataType.I64,
+                    DataType.I32,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.String,
+                            DataType.I64,
+                            DataType.Boolean,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    msgGetGroupMessageReadMembers.json_msg,
+                    msgGetGroupMessageReadMembers.filter,
+                    msgGetGroupMessageReadMembers.next_seq,
+                    msgGetGroupMessageReadMembers.count,
+                    (
+                        json_group_member_array: string,
+                        next_seq: number,
+                        is_finished: boolean,
+                        user_data: string
+                    ) => {
+                        // const [code, desc, json_param, user_data] = args;
+                        let param: Array<GroupMemberInfo> =
+                            json_group_member_array == ""
+                                ? []
+                                : JSON.parse(json_group_member_array);
+                        try {
+                            param = JSON.parse(
+                                json_group_member_array.trim().length > 0
+                                    ? json_group_member_array.trim()
+                                    : JSON.stringify([])
+                            );
+                        } catch {
+                            param = [] as Array<GroupMemberInfo>;
+                        }
+                        let result: MsgGetGroupMessageReadMemberListResult = {
+                            next_seq: next_seq,
+                            is_finished: is_finished,
+                            json_param: param,
+                        };
+                        resolve({
+                            code: 0,
+                            desc: "",
+                            json_param: result,
+                            user_data: user_data,
+                        });
+                    },
+                    msgGetGroupMessageReadMembers.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMMsgGetGroupMessageReadMemberList", cacheMap);
-
-            const code = this._imskdLib.TIMMsgGetGroupMessageReadMemberList(
-                nodeStrigToCString(json_msg),
-                filter,
-                next_seq,
-                count,
-                this._cache.get("TIMMsgGetGroupMessageReadMemberList")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
     /**
      * @brief 设置群属性，已有该群属性则更新其 value 值，没有该群属性则添加该群属性
+     * @note 除了话题外，群属性支持所有的群类型；
      * @category 群属性相关接口
      * @param DeleteAttributeParams
      * @return {Promise<commonResponse>}
@@ -1273,45 +1528,46 @@ class GroupManager {
     TIMGroupSetGroupAttributes(
         params: InitGroupAttributeParams
     ): Promise<commonResult<string>> {
-        const { groupId, attributes, data } = params;
-        const userData = this.stringFormator(data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupSetGroupAttributes")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupSetGroupAttributes");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupSetGroupAttributes",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    params.groupId,
+                    JSON.stringify(params.attributes),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    params.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupSetGroupAttributes", cacheMap);
-            const code = this._imskdLib.TIMGroupSetGroupAttributes(
-                nodeStrigToCString(groupId),
-                nodeStrigToCString(JSON.stringify(attributes)),
-                this._cache.get("TIMGroupSetGroupAttributes")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
     /**
      * @brief 删除群属性
+     * @note 版本开始，除了话题外，群属性支持所有的群类型；
      * @category 群属性相关接口
      * @param DeleteAttributeParams
      * @return {Promise<commonResponse>}
@@ -1319,49 +1575,46 @@ class GroupManager {
     TIMGroupDeleteGroupAttributes(
         params: DeleteAttributeParams
     ): Promise<commonResult<string>> {
-        const { groupId, attributesKey, data } = params;
-        const userData = this.stringFormator(data);
-        const formatedGroupId = nodeStrigToCString(groupId);
-        const formatedAttributesKey = nodeStrigToCString(
-            JSON.stringify(attributesKey)
-        );
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                code === 0
-                    ? resolve({ code, desc, json_param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupDeleteGroupAttributes")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupDeleteGroupAttributes");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupDeleteGroupAttributes",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    params.groupId,
+                    JSON.stringify(params.attributesKey),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    params.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupDeleteGroupAttributes", cacheMap);
-            const code = this._imskdLib.TIMGroupDeleteGroupAttributes(
-                formatedGroupId,
-                formatedAttributesKey,
-                this._cache.get("TIMGroupDeleteGroupAttributes")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
     /**
      * @brief 获取群指定属性，keys 传 null 则获取所有群属性。
+     * @note 版本开始，除了话题外，群属性支持所有的群类型；
      * @category 群属性相关接口
      * @param DeleteAttributeParams
      * @return {Promise<commonResponse>}
@@ -1369,71 +1622,321 @@ class GroupManager {
     TIMGroupGetGroupAttributes(
         params: DeleteAttributeParams
     ): Promise<commonResult<Array<GroupAttributes>>> {
-        const { groupId, attributesKey, data } = params;
-        const userData = this.stringFormator(data);
-        const formatedGroupId = nodeStrigToCString(groupId);
-        const formatedAttributesKey = nodeStrigToCString(
-            JSON.stringify(attributesKey)
-        );
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const successCallback: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: Array<GroupAttributes>;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<GroupAttributes>;
-                }
-                code === 0
-                    ? resolve({ code, desc, json_param: param, user_data })
-                    : reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMGroupGetGroupAttributes")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(successCallback);
-            let cacheMap = this._cache.get("TIMGroupGetGroupAttributes");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: successCallback,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupGetGroupAttributes",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    params.groupId,
+                    JSON.stringify(params.attributesKey),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<GroupAttributes>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<GroupAttributes>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    params.data ?? "",
+                ],
             });
-            this._cache.set("TIMGroupGetGroupAttributes", cacheMap);
-            const code = this._imskdLib.TIMGroupGetGroupAttributes(
-                formatedGroupId,
-                formatedAttributesKey,
-                this._cache.get("TIMGroupGetGroupAttributes")?.get(now)
-                    ?.callback,
-                userData
-            );
-            if (code !== 0) reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
-    private groupTipsEventCallback(
-        json_group_tip_array: string,
-        user_data: string
-    ) {
-        const fn = this._callback.get("TIMSetGroupTipsEventCallback");
-        fn && fn(json_group_tip_array, user_data);
+    /**
+     * @brief  获取当前用户已经加入的支持话题的社群列表
+     * @category 群属性相关接口
+     * @param GetCommunityListParam
+     * @return {Promise<commonResponse>}
+     */
+    TIMGroupGetJoinedCommunityList(
+        params: GetCommunityListParam
+    ): Promise<commonResult<Array<GroupBaseInfo>>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupGetJoinedCommunityList",
+                retType: DataType.I32,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<GroupBaseInfo>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<GroupBaseInfo>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    params.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
     }
-    private groupAttributeChangedCallback(
-        group_id: string,
-        json_group_attibute_array: string,
-        user_data: string
-    ) {
-        const fn = this._callback.get("TIMSetGroupAttributeChangedCallback");
-        fn && fn(group_id, json_group_attibute_array, user_data);
+    /**
+     * @brief  创建话题
+     * @category 群属性相关接口
+     * @param GetCommunityListParam
+     * @return {Promise<commonResponse>}
+     */
+    TIMGroupCreateTopicInCommunity(
+        params: CreateTopicParam
+    ): Promise<commonResult<string>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupCreateTopicInCommunity",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    params.group_id,
+                    JSON.stringify(params.json_topic_info),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    params.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
     }
+    /**
+     * @brief 删除话题
+     * @param params
+     * @returns Array<TopicOperationResult>
+     */
+    TIMGroupDeleteTopicFromCommunity(
+        params: DeleteTopicParam
+    ): Promise<commonResult<Array<TopicOperationResult>>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupDeleteTopicFromCommunity",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    params.group_id,
+                    JSON.stringify(params.json_topic_id_array),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<TopicOperationResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<TopicOperationResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    params.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+
+    /**
+     * @brief 修改话题信息
+     * @param params
+     * @returns string
+     */
+    TIMGroupSetTopicInfo(
+        params: SetTopicInfoParam
+    ): Promise<commonResult<string>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupSetTopicInfo",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(params.json_topic_info),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    params.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+
+    /**
+     * @brief 获取话题列表
+     * @param params
+     * @returns
+     */
+    TIMGroupGetTopicInfoList(
+        params: DeleteTopicParam
+    ): Promise<commonResult<Array<GroupTopicInfoResult>>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMGroupGetTopicInfoList",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    params.group_id,
+                    JSON.stringify(params.json_topic_id_array),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<GroupTopicInfoResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<GroupTopicInfoResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    params.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+
     /**
      * @brief 设置群组系统消息回调
      * @category 群组相关回调(callback)
@@ -1444,18 +1947,30 @@ class GroupManager {
     async TIMSetGroupTipsEventCallback(
         params: GroupTipsCallbackParams
     ): Promise<any> {
-        const { callback, data } = params;
-        const userData = this.stringFormator(data);
-        const c_callback = transformGroupTipFun(
-            this.groupTipsEventCallback.bind(this)
-        );
-        this._ffiCallback.set("TIMSetGroupTipsEventCallback", c_callback);
-        this._callback.set("TIMSetGroupTipsEventCallback", callback);
-
-        this._imskdLib.TIMSetGroupTipsEventCallback(
-            this._ffiCallback.get("TIMSetGroupTipsEventCallback") as Buffer,
-            userData
-        );
+        const { callback } = params;
+        if (callback != null) {
+            load({
+                library: libName,
+                funcName: "TIMSetGroupTipsEventCallback",
+                retType: DataType.Void,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [DataType.String, DataType.String],
+                        permanent: true,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [callback, params.data ?? ""],
+            });
+        } else {
+            load({
+                library: libName,
+                funcName: "TIMSetGroupTipsEventCallback",
+                retType: DataType.Void,
+                paramsType: [DataType.Void, DataType.String],
+                paramsValue: [null, params.data ?? ""],
+            });
+        }
     }
 
     /**
@@ -1468,22 +1983,163 @@ class GroupManager {
     async TIMSetGroupAttributeChangedCallback(
         params: GroupAttributeCallbackParams
     ): Promise<any> {
-        const { callback, data } = params;
-        const userData = this.stringFormator(data);
-        const c_callback = transformGroupAttributeFun(
-            this.groupAttributeChangedCallback.bind(this)
-        );
-        this._ffiCallback.set(
-            "TIMSetGroupAttributeChangedCallback",
-            c_callback
-        );
-        this._callback.set("TIMSetGroupAttributeChangedCallback", callback);
-        this._imskdLib.TIMSetGroupAttributeChangedCallback(
-            this._ffiCallback.get(
-                "TIMSetGroupAttributeChangedCallback"
-            ) as Buffer,
-            userData
-        );
+        const { callback } = params;
+        if (callback != null) {
+            load({
+                library: libName,
+                funcName: "TIMSetGroupAttributeChangedCallback",
+                retType: DataType.Void,
+                paramsType: [
+                    callback == null
+                        ? DataType.Void
+                        : funcConstructor({
+                              paramsType: [
+                                  DataType.String,
+                                  DataType.String,
+                                  DataType.String,
+                              ],
+                              permanent: true,
+                          }),
+                    DataType.String,
+                ],
+                paramsValue: [callback, params.data ?? ""],
+            });
+        } else {
+            load({
+                library: libName,
+                funcName: "TIMSetGroupAttributeChangedCallback",
+                retType: DataType.Void,
+                paramsType: [DataType.Void, DataType.String],
+                paramsValue: [null, params.data ?? ""],
+            });
+        }
+    }
+
+    /**
+     * @brief 设置群计数器变更回调
+     * @param params
+     * @note
+     * 某个已加入的群的计数器被修改了，会返回当前变更的群计数器（该群所有的成员都能收到）
+     */
+    async TIMSetGroupCounterChangedCallback(
+        params: GroupCounterChangedParam
+    ): Promise<any> {
+        const { callback } = params;
+        if (callback != null) {
+            load({
+                library: libName,
+                funcName: "TIMSetGroupCounterChangedCallback",
+                retType: DataType.Void,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.String,
+                            DataType.String,
+                            DataType.I64,
+                            DataType.String,
+                        ],
+                        permanent: true,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [callback, params.user_data ?? ""],
+            });
+        } else {
+            load({
+                library: libName,
+                funcName: "TIMSetGroupCounterChangedCallback",
+                retType: DataType.Void,
+                paramsType: [DataType.Void, DataType.String],
+                paramsValue: [null, params.user_data ?? ""],
+            });
+        }
+    }
+
+    /**
+     * @brief 话题创建
+     * @param params
+     */
+    async TIMSetGroupTopicCreatedCallback(
+        params: TopicCreatedParam
+    ): Promise<any> {
+        const { callback } = params;
+        load({
+            library: libName,
+            funcName: "TIMSetGroupTopicCreatedCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [
+                              DataType.String,
+                              DataType.String,
+                              DataType.String,
+                          ],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, params.user_data ?? ""],
+        });
+    }
+
+    /**
+     * @brief 话题被删除
+     * @param params
+     */
+    async TIMSetGroupTopicDeletedCallback(
+        params: TopicDeletedParam
+    ): Promise<any> {
+        const { callback } = params;
+        load({
+            library: libName,
+            funcName: "TIMSetGroupTopicDeletedCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [
+                              DataType.String,
+                              DataType.String,
+                              DataType.String,
+                          ],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, params.user_data ?? ""],
+        });
+    }
+
+    /**
+     * @brief 话题更新
+     * @param params
+     */
+    async TIMSetGroupTopicChangedCallback(
+        params: TopicChangedParam
+    ): Promise<any> {
+        const { callback } = params;
+        load({
+            library: libName,
+            funcName: "TIMSetGroupTopicChangedCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [
+                              DataType.String,
+                              DataType.String,
+                              DataType.String,
+                          ],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, params.user_data ?? ""],
+        });
     }
 }
 export default GroupManager;

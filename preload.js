@@ -3,7 +3,7 @@
 // const TIM = require("./im_electron_sdk")
 window.addEventListener('DOMContentLoaded', () => {
   // const tim = new TIM({
-  //   sdkappid: 1400187352
+  //   sdkappid: 
   // });
   // Window.tim = tim;
 })

@@ -1,0 +1,15 @@
+# Changelog
+
+## [2.0.19] - 202-10-16
+
+### Changed
+ - Changed few interfaces' spelling
+   - msg_getmsglist_param_is_remble  -->  msg_getmsglist_param_is_ramble
+   - group_search_member_result_menber_info_list  -->  group_search_member_result_member_info_list
+   - msg_delete_param_is_remble  -->  msg_delete_param_is_ramble
+   - group_atrribute_key  -->  group_attribute_key
+   - group_atrribute_value  --> group_attribute_value
+   - friend_respone_identifier  -->  friend_response_identifier
+   - friend_respone_action  -->  friend_response_action
+   - friend_respone_remark  -->  friend_response_remark
+   - friend_respone_group_name  -->. friend_response_group_name

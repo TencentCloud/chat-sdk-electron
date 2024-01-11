@@ -1,5 +1,5 @@
 import TimRender from "../../../im_electron_sdk/dist/renderer";
-import { CreateGroupParams, DeleteAttributeParams, DeleteGroupParams, DeleteMemberParams, GetGroupListParams, GetGroupMemberInfoParams, GetOnlineMemberCountParams, GetPendencyListParams, GroupAttributeCallbackParams, GroupTipsCallbackParams, HandlePendencyParams, InitGroupAttributeParams, InviteMemberParams, JoinGroupParams, ModifyGroupParams, ModifyMemberInfoParams, MsgGetGroupMessageReadMembersParam, MsgGetGroupMessageReceiptsParam, MsgGetMsgListParams, MsgSendGroupMessageReceiptsParam, QuitGroupParams, ReportParams, ReportPendencyReadedParams, SearchGroupParams, SearchMemberParams } from "../../../im_electron_sdk/dist/interfaces";
+import { CreateGroupParams, CreateTopicParam, DeleteAttributeParams, DeleteGroupParams, DeleteMemberParams, DeleteTopicParam, GetCommunityListParam, GetGroupCounterParams, GetGroupListParams, GetGroupMemberInfoParams, GetOnlineMemberCountParams, GetPendencyListParams, GroupAttributeCallbackParams, GroupCounterChangedParam, GroupCounterParams, GroupTipsCallbackParams, GroupTopicInfo, HandlePendencyParams, IncreaseGroupCounterParam, InitGroupAttributeParams, InviteMemberParams, JoinGroupParams, ModifyGroupParams, ModifyMemberInfoParams, MsgGetGroupMessageReadMembersParam, MsgGetGroupMessageReceiptsParam, MsgGetMsgListParams, MsgSendGroupMessageReceiptsParam, QuitGroupParams, ReportParams, ReportPendencyReadedParams, SearchGroupParams, SearchMemberParams, SetTopicInfoParam, TopicCreatedParam } from "../../../im_electron_sdk/dist/interfaces";
 // import TimRender from "im_electron_sdk/dist/renderer";
 const timRenderInstance = new TimRender();
 const TimBaseManager = {
@@ -8,8 +8,9 @@ const TimBaseManager = {
       params:
       {
         create_group_param_add_option: 2,
-        create_group_param_group_name: "FFFFFFF",
-        create_group_param_group_type: 1,
+        create_group_param_group_name: "communityGroup",
+        create_group_param_group_type: 5,
+        create_group_param_is_support_topic:true
         // create_group_param_custom_info: [{
         //   group_info_custom_string_info_key: 'group_info',
         //   group_info_custom_string_info_value: 'test value 1'
@@ -27,11 +28,14 @@ const TimBaseManager = {
       },
       data: "ssss"
     }
-    return timRenderInstance.TIMGroupCreate(obj);
+    let a = timRenderInstance.TIMGroupCreate(obj);
+    console.log("a"+JSON.stringify(a));
+    return a;
+    // return timRenderInstance.TIMGroupCreate(obj);
   },
   TIMGroupDelete: (groupId) => {
     let obj:DeleteGroupParams = {
-      groupId,
+      groupId:"@TGS#_@TGS#c5KIRIIM62C2",
       data: "ssss"
     }
     return timRenderInstance.TIMGroupDelete(obj);
@@ -58,6 +62,41 @@ const TimBaseManager = {
     }
     return timRenderInstance.TIMMsgSendMessageReadReceipts(obj); 
    },
+   TIMGroupSetGroupCounters(){
+    let param:GroupCounterParams = {
+      params:{
+        group_id:"@TGS#172OQIUIO",
+        json_group_counter_array:[{
+          group_counter_key:"key",
+          group_counter_value:2
+        }]
+      }
+    }
+    return timRenderInstance.TIMGroupSetGroupCounters(param)
+   },
+   TIMGroupGetGroupCounters(){
+    let param:GetGroupCounterParams = {
+      group_id:"@TGS#172OQIUIO",
+      json_group_counter_key_array:["key"]
+    }
+    return timRenderInstance.TIMGroupGetGroupCounters(param)
+   },
+   TIMGroupIncreaseGroupCounter(){
+    let param:IncreaseGroupCounterParam ={
+      group_id: "@TGS#172OQIUIO",
+      group_counter_key: "key",
+      group_counter_value: 3
+    }
+    return timRenderInstance.TIMGroupIncreaseGroupCounter(param)
+   },
+   TIMGroupDecreaseGroupCounter(){
+    let param:IncreaseGroupCounterParam ={
+      group_id: "@TGS#172OQIUIO",
+      group_counter_key: "key",
+      group_counter_value: 3
+    }
+    return timRenderInstance.TIMGroupDecreaseGroupCounter(param)
+   },
    async TIMMsgGetMessageReadReceipts(){
     let obj1 : MsgGetMsgListParams = {
       // conv_id: "@TGS#14Q5ONCJC",
@@ -66,7 +105,7 @@ const TimBaseManager = {
        params: {
           //  msg_getmsglist_param_last_msg: "",
            msg_getmsglist_param_count: 1,
-           msg_getmsglist_param_is_remble: true,
+           msg_getmsglist_param_is_ramble: true,
        }
     }
     const data = await timRenderInstance.TIMMsgGetMsgList(obj1)
@@ -81,7 +120,7 @@ const TimBaseManager = {
    async TIMMsgGetGroupMessageReadMemberList(){
     let obj1 : MsgGetMsgListParams = {
       // conv_id: "@TGS#14Q5ONCJC",
-      conv_id: "@TGS#1DS5WDSOBM",
+      conv_id: "@TGS#1KVCFG3IL",
        conv_type: 2,
        params: {
           //  msg_getmsglist_param_last_msg: "",
@@ -128,8 +167,8 @@ const TimBaseManager = {
   TIMGroupGetMemberInfoList: (id,seq) => {
     let param : GetGroupMemberInfoParams= {
       params: {
-        group_get_members_info_list_param_group_id: "@TGS#_im_discuss_6iQBFthZWrmRdcYS",
-        group_get_members_info_list_param_next_seq: seq,
+        group_get_members_info_list_param_group_id: "@TGS#2NDXSQQMN",
+        group_get_members_info_list_param_next_seq:0,
       }
     }
     return timRenderInstance.TIMGroupGetMemberInfoList(param)
@@ -194,8 +233,8 @@ const TimBaseManager = {
     let param : InitGroupAttributeParams = {
       groupId,
       attributes: [{
-        group_atrribute_key: 'attribute1',
-        group_atrribute_value: 'hello'
+        group_attribute_key: 'attribute1',
+        group_attribute_value: 'hello'
       }],
       data: 'test data'
     }
@@ -205,8 +244,8 @@ const TimBaseManager = {
     let param : InitGroupAttributeParams = {
       groupId,
       attributes: [{
-        group_atrribute_key: 'attribute2',
-        group_atrribute_value: 'hello22'
+        group_attribute_key: 'attribute2',
+        group_attribute_value: 'hello22'
       }],
       data: 'test data'
     }
@@ -314,6 +353,65 @@ const TimBaseManager = {
       data: 'test data'
     }
     return timRenderInstance.TIMSetGroupTipsEventCallback(param)
+  },
+  TIMGroupGetJoinedCommunityList:() => {
+    let param:GetCommunityListParam = {
+      user_data:"a"
+    }
+    return timRenderInstance.TIMGroupGetJoinedCommunityList(param)
+  },
+  TIMGroupCreateTopicInCommunity:() => {
+    let info:GroupTopicInfo = {
+      group_topic_info_topic_id: "@TGS#_@TGS#cHICHIIM62C3@TOPIC#_topic12",
+      group_topic_info_topic_name: "topic1"
+    }
+    let param :CreateTopicParam = {
+      group_id: "@TGS#_@TGS#cHICHIIM62C3",
+      json_topic_info: info
+    }
+    return timRenderInstance.TIMGroupCreateTopicInCommunity(param)
+  },
+  TIMGroupDeleteTopicFromCommunity:()=>{
+    let param:DeleteTopicParam = {
+      group_id: "@TGS#_@TGS#cHICHIIM62C3",
+      json_topic_id_array: ["@TGS#_@TGS#cHICHIIM62C3@TOPIC#_topic12"]
+    }
+    return timRenderInstance.TIMGroupDeleteTopicFromCommunity(param)
+  },
+  TIMGroupSetTopicInfo:()=>{
+    let info:GroupTopicInfo = {
+      group_topic_info_topic_id: "@TGS#_@TGS#cHICHIIM62C3@TOPIC#_topic12",
+      group_topic_info_topic_name: "topic2",
+      group_modify_info_param_modify_flag:0x01
+    }
+    let param:SetTopicInfoParam = {
+      json_topic_info:info
+    }
+    return timRenderInstance.TIMGroupSetTopicInfo(param)
+  },
+  TIMGroupGetTopicInfoList:()=>{
+    let param:DeleteTopicParam = {
+      group_id: "@TGS#_@TGS#cHICHIIM62C3",
+      json_topic_id_array: ["@TGS#_@TGS#cHICHIIM62C3@TOPIC#_topic12"]
+    }
+    return timRenderInstance.TIMGroupGetTopicInfoList(param)
+  },
+  TIMSetGroupCounterChangedCallback:()=>{
+    let param:GroupCounterChangedParam = {
+      callback:(...args)=>{
+        console.log(args);
+      }
+    }
+    return timRenderInstance.TIMSetGroupCounterChangedCallback(param);
+  },
+  TIMSetGroupTopicCreatedCallback:()=>{
+    let param:TopicCreatedParam={
+      callback:(...args)=>{
+        console.log("topiccreated");
+        console.log(args);
+      }
+    }
+    return timRenderInstance.TIMSetGroupTopicCreatedCallback(param);
   }
 }
 

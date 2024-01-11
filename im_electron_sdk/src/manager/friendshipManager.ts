@@ -18,12 +18,8 @@ import {
     DeletePendencyParams,
     ReportPendencyReadedParams,
     SearchFriendsParams,
-    ErrorResponse,
-    sdkconfig,
-    cache,
-    commonResponse,
-    CommonCallbackFuns,
     commonResult,
+    sdkconfig,
 } from "../interface";
 import {
     TIMOnAddFriendCallbackParams,
@@ -41,43 +37,23 @@ import {
     PendencyPage,
     FriendInfoGetResult,
 } from "../interface/friendshipInterface";
-import {
-    nodeStrigToCString,
-    jsFuncToFFIFun,
-    randomString,
-} from "../utils/utils";
-const ffi = require("ffi-napi");
-const voidPtrType = function () {
-    return ffi.types.CString;
-};
-const charPtrType = function () {
-    return ffi.types.CString;
-};
-const voidType = function () {
-    return ffi.types.void;
-};
+
+const {
+    load,
+    DataType,
+
+    funcConstructor,
+} = require("ffi-rs");
+
+const libName = "libImSDK";
 
 class FriendshipManager {
     private _sdkconfig: sdkconfig;
-    private _callback: Map<String, Function> = new Map();
-    private _ffiCallback: Map<String, Buffer> = new Map();
-    private stringFormator = (str: string | undefined): string =>
-        str ? nodeStrigToCString(str) : nodeStrigToCString("");
-    private _cache: Map<String, Map<string, cache>> = new Map();
-    getErrorResponse(params: ErrorResponse) {
-        return {
-            code: params.code || -1,
-            desc: params.desc || "error",
-            json_params: params.json_params || "",
-            user_data: params.user_data || "",
-        };
-    }
+
     setSDKAPPID(sdkappid: number) {
         this._sdkconfig.sdkappid = sdkappid;
     }
-    getErrorResponseByCode(code: number) {
-        return this.getErrorResponse({ code });
-    }
+
     /** @internal */
     constructor(config: sdkconfig) {
         this._sdkconfig = config;
@@ -105,54 +81,51 @@ class FriendshipManager {
     TIMFriendshipGetFriendProfileList(
         getFriendProfileListParam: GetFriendProfileListParams
     ): Promise<commonResult<Array<FriendProfile>>> {
-        const { user_data = " " } = getFriendProfileListParam;
-        const c_user_data = this.stringFormator(user_data);
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<FriendProfile>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<FriendProfile>;
-                }
-                if (code === 0) {
-                    resolve({ code, desc, json_params: param, user_data });
-                } else {
-                    reject(this.getErrorResponse({ code, desc }));
-                }
-                this._cache
-                    .get("TIMFriendshipGetFriendProfileList")
-                    ?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipGetFriendProfileList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipGetFriendProfileList",
+                retType: DataType.I32,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<FriendProfile>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<FriendProfile>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    getFriendProfileListParam.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipGetFriendProfileList", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMFriendshipGetFriendProfileList(
-                    this._cache
-                        .get("TIMFriendshipGetFriendProfileList")
-                        ?.get(now)?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -167,50 +140,53 @@ class FriendshipManager {
     TIMFriendshipAddFriend(
         addFriendParams: AddFriendParams
     ): Promise<commonResult<FriendResult>> {
-        const { params, user_data } = addFriendParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: FriendResult;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify({})
-                    );
-                } catch {
-                    param = {} as FriendResult;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipAddFriend")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipAddFriend");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipAddFriend",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(addFriendParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: FriendResult;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as FriendResult;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    addFriendParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipAddFriend", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMFriendshipAddFriend(
-                c_params,
-                this._cache.get("TIMFriendshipAddFriend")?.get(now)?.callback,
-                c_user_data
-            );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -225,57 +201,53 @@ class FriendshipManager {
     TIMFriendshipHandleFriendAddRequest(
         handleFriendAddParams: HandleFriendAddParams
     ): Promise<commonResult<FriendResult>> {
-        const { params, user_data } = handleFriendAddParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: FriendResult;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify({})
-                    );
-                } catch {
-                    param = {} as FriendResult;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache
-                    .get("TIMFriendshipHandleFriendAddRequest")
-                    ?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get(
-                "TIMFriendshipHandleFriendAddRequest"
-            );
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipHandleFriendAddRequest",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(handleFriendAddParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: FriendResult;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as FriendResult;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    handleFriendAddParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipHandleFriendAddRequest", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMFriendshipHandleFriendAddRequest(
-                    c_params,
-                    this._cache
-                        .get("TIMFriendshipHandleFriendAddRequest")
-                        ?.get(now)?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
@@ -290,44 +262,38 @@ class FriendshipManager {
     TIMFriendshipModifyFriendProfile(
         modifyFriendProfileParams: ModifyFriendProfileParams
     ): Promise<commonResult<string>> {
-        const { params, user_data } = modifyFriendProfileParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                if (code === 0) resolve({ code, desc, json_params, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache
-                    .get("TIMFriendshipModifyFriendProfile")
-                    ?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipModifyFriendProfile");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipModifyFriendProfile",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(modifyFriendProfileParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_params, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_params, user_data });
+                        } else {
+                            reject({ code, desc, json_params, user_data });
+                        }
+                    },
+                    modifyFriendProfileParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipModifyFriendProfile", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMFriendshipModifyFriendProfile(
-                    c_params,
-                    this._cache
-                        .get("TIMFriendshipModifyFriendProfile")
-                        ?.get(now)?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -341,51 +307,53 @@ class FriendshipManager {
     TIMFriendshipDeleteFriend(
         deleteFriendParams: DeleteFriendParams
     ): Promise<commonResult<Array<FriendResult>>> {
-        const now = `${Date.now()}${randomString()}`;
-        const { params, user_data } = deleteFriendParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<FriendResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<FriendResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipDeleteFriend")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipDeleteFriend");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipDeleteFriend",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(deleteFriendParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<FriendResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<FriendResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    deleteFriendParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipDeleteFriend", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMFriendshipDeleteFriend(
-                c_params,
-                this._cache.get("TIMFriendshipDeleteFriend")?.get(now)
-                    ?.callback,
-                c_user_data
-            );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -399,43 +367,53 @@ class FriendshipManager {
     TIMFriendshipCheckFriendType(
         checkFriendTypeParams: CheckFriendTypeParams
     ): Promise<commonResult<Array<CheckFriendTypeResult>>> {
-        const now = `${Date.now()}${randomString()}`;
-        const { params, user_data } = checkFriendTypeParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<CheckFriendTypeResult> =
-                    json_params == "" ? [] : JSON.parse(json_params);
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipCheckFriendType")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipCheckFriendType");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipCheckFriendType",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(checkFriendTypeParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<CheckFriendTypeResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<CheckFriendTypeResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    checkFriendTypeParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipCheckFriendType", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMFriendshipCheckFriendType(
-                c_params,
-                this._cache.get("TIMFriendshipCheckFriendType")?.get(now)
-                    ?.callback,
-                c_user_data
-            );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -449,52 +427,53 @@ class FriendshipManager {
     TIMFriendshipCreateFriendGroup(
         createFriendGroupParams: CreateFriendGroupParams
     ): Promise<commonResult<Array<FriendResult>>> {
-        const now = `${Date.now()}${randomString()}`;
-        const { params, user_data } = createFriendGroupParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<FriendResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<FriendResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipCreateFriendGroup")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipCreateFriendGroup");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipCreateFriendGroup",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(createFriendGroupParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<FriendResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<FriendResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    createFriendGroupParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipCreateFriendGroup", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMFriendshipCreateFriendGroup(
-                    c_params,
-                    this._cache.get("TIMFriendshipCreateFriendGroup")?.get(now)
-                        ?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -506,52 +485,53 @@ class FriendshipManager {
     TIMFriendshipGetFriendGroupList(
         friendshipStringArrayParams: FriendshipStringArrayParams
     ): Promise<commonResult<Array<FriendGroupInfo>>> {
-        const now = `${Date.now()}${randomString()}`;
-        const { params, user_data } = friendshipStringArrayParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<FriendGroupInfo>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<FriendGroupInfo>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipGetFriendGroupList")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipGetFriendGroupList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipGetFriendGroupList",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(friendshipStringArrayParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<FriendGroupInfo>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<FriendGroupInfo>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    friendshipStringArrayParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipGetFriendGroupList", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMFriendshipGetFriendGroupList(
-                    c_params,
-                    this._cache.get("TIMFriendshipGetFriendGroupList")?.get(now)
-                        ?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -563,52 +543,53 @@ class FriendshipManager {
     TIMFriendshipModifyFriendGroup(
         modifyFriendGroupParams: ModifyFriendGroupParams
     ): Promise<commonResult<Array<FriendResult>>> {
-        const now = `${Date.now()}${randomString()}`;
-        const { params, user_data } = modifyFriendGroupParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<FriendResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<FriendResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipModifyFriendGroup")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipModifyFriendGroup");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipModifyFriendGroup",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(modifyFriendGroupParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<FriendResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<FriendResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    modifyFriendGroupParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipModifyFriendGroup", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMFriendshipModifyFriendGroup(
-                    c_params,
-                    this._cache.get("TIMFriendshipModifyFriendGroup")?.get(now)
-                        ?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -620,41 +601,38 @@ class FriendshipManager {
     TIMFriendshipDeleteFriendGroup(
         friendshipStringArrayParams: FriendshipStringArrayParams
     ): Promise<commonResult<string>> {
-        const now = `${Date.now()}${randomString()}`;
-        const { params, user_data } = friendshipStringArrayParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                if (code === 0) resolve({ code, desc, json_params, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipDeleteFriendGroup")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipDeleteFriendGroup");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipDeleteFriendGroup",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(friendshipStringArrayParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_params, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_params, user_data });
+                        } else {
+                            reject({ code, desc, json_params, user_data });
+                        }
+                    },
+                    friendshipStringArrayParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipDeleteFriendGroup", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMFriendshipDeleteFriendGroup(
-                    c_params,
-                    this._cache.get("TIMFriendshipDeleteFriendGroup")?.get(now)
-                        ?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -666,51 +644,53 @@ class FriendshipManager {
     TIMFriendshipAddToBlackList(
         friendshipStringArrayParams: FriendshipStringArrayParams
     ): Promise<commonResult<Array<FriendResult>>> {
-        const now = `${Date.now()}${randomString()}`;
-        const { params, user_data } = friendshipStringArrayParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<FriendResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<FriendResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipAddToBlackList")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipAddToBlackList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipAddToBlackList",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(friendshipStringArrayParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<FriendResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<FriendResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    friendshipStringArrayParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipAddToBlackList", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMFriendshipAddToBlackList(
-                c_params,
-                this._cache.get("TIMFriendshipAddToBlackList")?.get(now)
-                    ?.callback,
-                c_user_data
-            );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -722,49 +702,51 @@ class FriendshipManager {
     TIMFriendshipGetBlackList(
         getBlackListParams: GetBlackListParams
     ): Promise<commonResult<Array<FriendProfile>>> {
-        const now = `${Date.now()}${randomString()}`;
-        const { user_data } = getBlackListParams;
-        const c_user_data = this.stringFormator(user_data);
-
         return new Promise((resolve, reject) => {
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<FriendProfile>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<FriendProfile>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipGetBlackList")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipGetBlackList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipGetBlackList",
+                retType: DataType.I32,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<FriendProfile>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<FriendProfile>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    getBlackListParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipGetBlackList", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMFriendshipGetBlackList(
-                this._cache.get("TIMFriendshipGetBlackList")?.get(now)
-                    ?.callback,
-                c_user_data
-            );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -776,55 +758,53 @@ class FriendshipManager {
     TIMFriendshipDeleteFromBlackList(
         friendshipStringArrayParams: FriendshipStringArrayParams
     ): Promise<commonResult<Array<FriendResult>>> {
-        const { params, user_data } = friendshipStringArrayParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<FriendResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<FriendResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache
-                    .get("TIMFriendshipDeleteFromBlackList")
-                    ?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipDeleteFromBlackList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipDeleteFromBlackList",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(friendshipStringArrayParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<FriendResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<FriendResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    friendshipStringArrayParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipDeleteFromBlackList", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMFriendshipDeleteFromBlackList(
-                    c_params,
-                    this._cache
-                        .get("TIMFriendshipDeleteFromBlackList")
-                        ?.get(now)?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -836,51 +816,53 @@ class FriendshipManager {
     TIMFriendshipGetPendencyList(
         friendshipGetPendencyListParams: FriendshipGetPendencyListParams
     ): Promise<commonResult<PendencyPage>> {
-        const { params, user_data } = friendshipGetPendencyListParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: PendencyPage;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify({})
-                    );
-                } catch {
-                    param = {} as PendencyPage;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipGetPendencyList")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipGetPendencyList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipGetPendencyList",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(friendshipGetPendencyListParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: PendencyPage;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as PendencyPage;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    friendshipGetPendencyListParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipGetPendencyList", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMFriendshipGetPendencyList(
-                c_params,
-                this._cache.get("TIMFriendshipGetPendencyList")?.get(now)
-                    ?.callback,
-                c_user_data
-            );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -892,51 +874,53 @@ class FriendshipManager {
     TIMFriendshipDeletePendency(
         deletePendencyParams: DeletePendencyParams
     ): Promise<commonResult<Array<FriendResult>>> {
-        const { params, user_data } = deletePendencyParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<FriendResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<FriendResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipDeletePendency")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipDeletePendency");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipDeletePendency",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(deletePendencyParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<FriendResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<FriendResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    deletePendencyParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipDeletePendency", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMFriendshipDeletePendency(
-                c_params,
-                this._cache.get("TIMFriendshipDeletePendency")?.get(now)
-                    ?.callback,
-                c_user_data
-            );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -948,43 +932,38 @@ class FriendshipManager {
     TIMFriendshipReportPendencyReaded(
         reportPendencyReadedParams: ReportPendencyReadedParams
     ): Promise<commonResult<string>> {
-        const { timestamp, user_data } = reportPendencyReadedParams;
-        const c_user_data = this.stringFormator(user_data);
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                if (code === 0) resolve({ code, desc, json_params, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache
-                    .get("TIMFriendshipReportPendencyReaded")
-                    ?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipReportPendencyReaded");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipReportPendencyReaded",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.I64,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    reportPendencyReadedParams.timestamp ?? 0,
+                    (...args: any) => {
+                        const [code, desc, json_params, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_params, user_data });
+                        } else {
+                            reject({ code, desc, json_params, user_data });
+                        }
+                    },
+                    reportPendencyReadedParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipReportPendencyReaded", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMFriendshipReportPendencyReaded(
-                    timestamp,
-                    this._cache
-                        .get("TIMFriendshipReportPendencyReaded")
-                        ?.get(now)?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -996,51 +975,53 @@ class FriendshipManager {
     TIMFriendshipSearchFriends(
         searchFriendsParams: SearchFriendsParams
     ): Promise<commonResult<Array<FriendInfoGetResult>>> {
-        const { params, user_data } = searchFriendsParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<FriendInfoGetResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<FriendInfoGetResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipSearchFriends")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipSearchFriends");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipSearchFriends",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(searchFriendsParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<FriendInfoGetResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<FriendInfoGetResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    searchFriendsParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipSearchFriends", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMFriendshipSearchFriends(
-                c_params,
-                this._cache.get("TIMFriendshipSearchFriends")?.get(now)
-                    ?.callback,
-                c_user_data
-            );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -1052,110 +1033,58 @@ class FriendshipManager {
     TIMFriendshipGetFriendsInfo(
         friendshipStringArrayParams: FriendshipStringArrayParams
     ): Promise<commonResult<Array<FriendInfoGetResult>>> {
-        const { params, user_data } = friendshipStringArrayParams;
-        const c_user_data = this.stringFormator(user_data);
-        const c_params = this.stringFormator(JSON.stringify(params));
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFuns = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<FriendInfoGetResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<FriendInfoGetResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMFriendshipGetFriendsInfo")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMFriendshipGetFriendsInfo");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMFriendshipGetFriendsInfo",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(friendshipStringArrayParams.params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<FriendInfoGetResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<FriendInfoGetResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    friendshipStringArrayParams.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMFriendshipGetFriendsInfo", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMFriendshipGetFriendsInfo(
-                c_params,
-                this._cache.get("TIMFriendshipGetFriendsInfo")?.get(now)
-                    ?.callback,
-                c_user_data
-            );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
     // callback begin
 
-    private onAddFriendCallback(json_msg_array: Buffer, user_data?: any) {
-        const fn = this._callback.get("TIMSetOnAddFriendCallback");
-        fn && fn(json_msg_array, user_data);
-    }
-    private onDeleteFriendCallback(
-        json_identifier_array: Buffer,
-        user_data?: any
-    ) {
-        const fn = this._callback.get("TIMSetOnDeleteFriendCallback");
-        fn && fn(json_identifier_array, user_data);
-    }
-    private updateFriendProfileCallback(
-        json_friend_profile_update_array: Buffer,
-        user_data?: any
-    ) {
-        const fn = this._callback.get("TIMSetUpdateFriendProfileCallback");
-        fn && fn(json_friend_profile_update_array, user_data);
-    }
-    private friendAddRequestCallback(
-        json_friend_add_request_pendency_array: Buffer,
-        user_data?: any
-    ) {
-        const fn = this._callback.get("TIMSetFriendAddRequestCallback");
-        fn && fn(json_friend_add_request_pendency_array, user_data);
-    }
-    private friendApplicationListDeletedCallback(
-        json_msg_array: Buffer,
-        user_data?: any
-    ) {
-        const fn = this._callback.get(
-            "TIMSetFriendApplicationListDeletedCallback"
-        );
-        fn && fn(json_msg_array, user_data);
-    }
-    private friendApplicationListReadCallback(user_data?: any) {
-        const fn = this._callback.get(
-            "TIMSetFriendApplicationListReadCallback"
-        );
-        fn && fn(user_data);
-    }
-    private friendBlackListAddedCallback(
-        json_friend_black_added_array: Buffer,
-        user_data?: any
-    ) {
-        const fn = this._callback.get("TIMSetFriendBlackListAddedCallback");
-        fn && fn(json_friend_black_added_array, user_data);
-    }
-    private friendBlackListDeletedCallback(
-        json_identifier_array: Buffer,
-        user_data?: any
-    ) {
-        const fn = this._callback.get("TIMSetFriendBlackListDeletedCallback");
-        fn && fn(json_identifier_array, user_data);
-    }
     /**
      * @brief 设置添加好友的回调
      * @category 好友相关回调(callback)
@@ -1165,19 +1094,22 @@ class FriendshipManager {
      * 此回调为了多终端同步。例如A设备、B设备都登录了同一帐号的ImSDK，A设备添加了好友，B设备ImSDK会收到添加好友的推送，ImSDK通过此回调告知开发者。
      */
     TIMSetOnAddFriendCallback(params: TIMOnAddFriendCallbackParams): void {
-        const { callback, user_data = " " } = params;
-        const c_user_data = this.stringFormator(user_data);
-        this._callback.set("TIMSetOnAddFriendCallback", callback);
-        const c_callback = ffi.Callback(
-            voidType(),
-            [charPtrType(), voidPtrType()],
-            this.onAddFriendCallback.bind(this)
-        );
-        this._ffiCallback.set("TIMSetOnAddFriendCallback", c_callback);
-        this._sdkconfig.Imsdklib.TIMSetOnAddFriendCallback(
-            this._ffiCallback.get("TIMSetOnAddFriendCallback") as Buffer,
-            c_user_data
-        );
+        const { callback } = params;
+        load({
+            library: libName,
+            funcName: "TIMSetOnAddFriendCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [DataType.String, DataType.String],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, params.user_data ?? ""],
+        });
     }
 
     /**
@@ -1190,19 +1122,22 @@ class FriendshipManager {
     TIMSetOnDeleteFriendCallback(
         params: TIMOnDeleteFriendCallbackParams
     ): void {
-        const { callback, user_data = " " } = params;
-        const c_user_data = this.stringFormator(user_data);
-        this._callback.set("TIMSetOnDeleteFriendCallback", callback);
-        const c_callback = ffi.Callback(
-            voidType(),
-            [charPtrType(), voidPtrType()],
-            this.onDeleteFriendCallback.bind(this)
-        );
-        this._ffiCallback.set("TIMSetOnDeleteFriendCallback", c_callback);
-        this._sdkconfig.Imsdklib.TIMSetOnDeleteFriendCallback(
-            this._ffiCallback.get("TIMSetOnDeleteFriendCallback") as Buffer,
-            c_user_data
-        );
+        const { callback } = params;
+        load({
+            library: libName,
+            funcName: "TIMSetOnDeleteFriendCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [DataType.String, DataType.String],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, params.user_data ?? ""],
+        });
     }
 
     /**
@@ -1215,22 +1150,22 @@ class FriendshipManager {
     TIMSetUpdateFriendProfileCallback(
         params: TIMUpdateFriendProfileCallbackParams
     ): void {
-        const { callback, user_data = " " } = params;
-        const c_user_data = this.stringFormator(user_data);
-
-        this._callback.set("TIMSetUpdateFriendProfileCallback", callback);
-        const c_callback = ffi.Callback(
-            voidType(),
-            [charPtrType(), voidPtrType()],
-            this.updateFriendProfileCallback.bind(this)
-        );
-        this._ffiCallback.set("TIMSetUpdateFriendProfileCallback", c_callback);
-        this._sdkconfig.Imsdklib.TIMSetUpdateFriendProfileCallback(
-            this._ffiCallback.get(
-                "TIMSetUpdateFriendProfileCallback"
-            ) as Buffer,
-            c_user_data
-        );
+        const { callback } = params;
+        load({
+            library: libName,
+            funcName: "TIMSetUpdateFriendProfileCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [DataType.String, DataType.String],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, params.user_data ?? ""],
+        });
     }
 
     /**
@@ -1243,20 +1178,22 @@ class FriendshipManager {
     TIMSetFriendAddRequestCallback(
         params: TIMFriendAddRequestCallbackParams
     ): void {
-        const { callback, user_data = " " } = params;
-        const c_user_data = this.stringFormator(user_data);
-
-        this._callback.set("TIMSetFriendAddRequestCallback", callback);
-        const c_callback = ffi.Callback(
-            voidType(),
-            [charPtrType(), voidPtrType()],
-            this.friendAddRequestCallback.bind(this)
-        );
-        this._ffiCallback.set("TIMSetFriendAddRequestCallback", c_callback);
-        this._sdkconfig.Imsdklib.TIMSetFriendAddRequestCallback(
-            this._ffiCallback.get("TIMSetFriendAddRequestCallback") as Buffer,
-            c_user_data
-        );
+        const { callback } = params;
+        load({
+            library: libName,
+            funcName: "TIMSetFriendAddRequestCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [DataType.String, DataType.String],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, params.user_data ?? ""],
+        });
     }
 
     /**
@@ -1272,28 +1209,22 @@ class FriendshipManager {
     TIMSetFriendApplicationListDeletedCallback(
         params: TIMFriendApplicationListDeletedCallbackParams
     ): void {
-        const { callback, user_data = " " } = params;
-        const c_user_data = this.stringFormator(user_data);
-
-        this._callback.set(
-            "TIMSetFriendApplicationListDeletedCallback",
-            callback
-        );
-        const c_callback = ffi.Callback(
-            voidType(),
-            [charPtrType(), voidPtrType()],
-            this.friendApplicationListDeletedCallback.bind(this)
-        );
-        this._ffiCallback.set(
-            "TIMSetFriendApplicationListDeletedCallback",
-            c_callback
-        );
-        this._sdkconfig.Imsdklib.TIMSetFriendApplicationListDeletedCallback(
-            this._ffiCallback.get(
-                "TIMSetFriendApplicationListDeletedCallback"
-            ) as Buffer,
-            c_user_data
-        );
+        const { callback } = params;
+        load({
+            library: libName,
+            funcName: "TIMSetFriendApplicationListDeletedCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [DataType.String, DataType.String],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, params.user_data ?? ""],
+        });
     }
 
     /**
@@ -1306,25 +1237,22 @@ class FriendshipManager {
     TIMSetFriendApplicationListReadCallback(
         params: TIMFriendApplicationListReadCallbackParams
     ): void {
-        const { callback, user_data = " " } = params;
-        const c_user_data = this.stringFormator(user_data);
-
-        this._callback.set("TIMSetFriendApplicationListReadCallback", callback);
-        const c_callback = ffi.Callback(
-            voidType(),
-            [charPtrType(), voidPtrType()],
-            this.friendApplicationListReadCallback.bind(this)
-        );
-        this._ffiCallback.set(
-            "TIMSetFriendApplicationListReadCallback",
-            c_callback
-        );
-        this._sdkconfig.Imsdklib.TIMSetFriendApplicationListReadCallback(
-            this._ffiCallback.get(
-                "TIMSetFriendApplicationListDeletedCallback"
-            ) as Buffer,
-            c_user_data
-        );
+        const { callback } = params;
+        load({
+            library: libName,
+            funcName: "TIMSetFriendApplicationListReadCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [DataType.String],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, params.user_data ?? ""],
+        });
     }
     /**
      * @brief 设置黑名单新增的回调
@@ -1334,22 +1262,22 @@ class FriendshipManager {
     TIMSetFriendBlackListAddedCallback(
         params: TIMFriendBlackListAddedCallbackParams
     ): void {
-        const { callback, user_data = " " } = params;
-        const c_user_data = this.stringFormator(user_data);
-
-        this._callback.set("TIMSetFriendBlackListAddedCallback", callback);
-        const c_callback = ffi.Callback(
-            voidType(),
-            [charPtrType(), voidPtrType()],
-            this.friendBlackListAddedCallback.bind(this)
-        );
-        this._ffiCallback.set("TIMSetFriendBlackListAddedCallback", c_callback);
-        this._sdkconfig.Imsdklib.TIMSetFriendBlackListAddedCallback(
-            this._ffiCallback.get(
-                "TIMSetFriendBlackListAddedCallback"
-            ) as Buffer,
-            c_user_data
-        );
+        const { callback } = params;
+        load({
+            library: libName,
+            funcName: "TIMSetFriendBlackListAddedCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [DataType.String, DataType.String],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, params.user_data ?? ""],
+        });
     }
 
     /**
@@ -1360,24 +1288,22 @@ class FriendshipManager {
     TIMSetFriendBlackListDeletedCallback(
         params: TIMFriendBlackListDeletedCallbackParams
     ): void {
-        const { callback, user_data = " " } = params;
-        const c_user_data = this.stringFormator(user_data);
-        this._callback.set("TIMSetFriendBlackListDeletedCallback", callback);
-        const c_callback = ffi.Callback(
-            voidType(),
-            [charPtrType(), voidPtrType()],
-            this.friendBlackListDeletedCallback.bind(this)
-        );
-        this._ffiCallback.set(
-            "TIMSetFriendBlackListDeletedCallback",
-            c_callback
-        );
-        this._sdkconfig.Imsdklib.TIMSetFriendBlackListDeletedCallback(
-            this._ffiCallback.get(
-                "TIMSetFriendBlackListDeletedCallback"
-            ) as Buffer,
-            c_user_data
-        );
+        const { callback } = params;
+        load({
+            library: libName,
+            funcName: "TIMSetFriendBlackListDeletedCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [DataType.String, DataType.String],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, params.user_data ?? ""],
+        });
     }
     // callback end
 }

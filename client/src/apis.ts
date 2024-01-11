@@ -45,11 +45,12 @@ const APIS = [
             {
                 name: "TIMLogin",
                 action: (callback) => {
-                    TimBaseManager.TIMLogin().then(data => {
-                        callback(JSON.stringify(data))
-                    }).catch(err => {
-                        callback(err.toString())
-                    })
+                        TimBaseManager.TIMLogin().then(data => {
+                            callback(JSON.stringify(data))
+                        }).catch(err => {
+                            callback(err.toString())
+                        })
+
                 }
             },
             {
@@ -75,8 +76,30 @@ const APIS = [
             {
                 name: "TIMInviteInGroup",
                 action: (callback) => {
-                    TimBaseManager.TIMInviteInGroup().then(data => {
-                        console.log(data,113212)
+                    // TimBaseManager.TIMInviteInGroup().then(data => {
+                    //     console.log(data,113212)
+                    //     callback(JSON.stringify(data))
+                    // }).catch(err => {
+                    //     console.log(err)
+                    //     callback(err.toString())
+                    // })
+                }
+            },
+            {
+                name: "TIMSetSelfInfoUpdatedCallback",
+                action: (callback) => {
+                    TimBaseManager.TIMSetSelfInfoUpdatedCallback().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        console.log(err)
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMSetUserStatusChangedCallback",
+                action: (callback) => {
+                    TimBaseManager.TIMSetUserStatusChangedCallback().then(data => {
                         callback(JSON.stringify(data))
                     }).catch(err => {
                         console.log(err)
@@ -231,6 +254,46 @@ const APIS = [
                 name:"TIMProfileModifySelfUserProfile",
                 action:(callback)=>{
                     TimBaseManager.TIMProfileModifySelfUserProfile().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name:"TIMGetUserStatus",
+                action:(callback)=>{
+                    TimBaseManager.TIMGetUserStatus().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name:"TIMSetSelfStatus",
+                action:(callback)=>{
+                    TimBaseManager.TIMSetSelfStatus().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name:"TIMSubscribeUserStatus",
+                action:(callback)=>{
+                    TimBaseManager.TIMSubscribeUserStatus().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name:"TIMUnsubscribeUserStatus",
+                action:(callback)=>{
+                    TimBaseManager.TIMUnsubscribeUserStatus().then(data=>{
                         callback(JSON.stringify(data))
                     }).catch(err=>{
                         callback(err.toString())
@@ -465,6 +528,106 @@ const APIS = [
                     })
                 }
             },
+            {
+                name:"TIMConvDeleteConversationList",
+                action:(callback)=>{
+                    ConversationManager.TIMConvDeleteConversationList().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err)
+                    })
+                }
+            },
+            {
+                name:"TIMConvGetUnreadMessageCountByFilter",
+                action:(callback)=>{
+                    ConversationManager.TIMConvGetUnreadMessageCountByFilter().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err)
+                    })
+                }
+            },
+            {
+                name:"TIMConvSubscribeUnreadMessageCountByFilter",
+                action:(callback)=>{
+                    ConversationManager.TIMConvSubscribeUnreadMessageCountByFilter().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err)
+                    })
+                }
+            },
+            {
+                name:"TIMConvUnsubscribeUnreadMessageCountByFilter",
+                action:(callback)=>{
+                    ConversationManager.TIMConvUnsubscribeUnreadMessageCountByFilter().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err)
+                    })
+                }
+            },
+            {
+                name:"TIMConvCleanConversationUnreadMessageCount",
+                action:(callback)=>{
+                    ConversationManager.TIMConvCleanConversationUnreadMessageCount().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err)
+                    })
+                }
+            },
+            {
+                name:"TIMSetConvConversationGroupCreatedCallback",
+                action:(callback)=>{
+                    ConversationManager.TIMSetConvConversationGroupCreatedCallback().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err)
+                    })
+                }
+            },
+            {
+                name:"TIMSetConvConversationGroupDeletedCallback",
+                action:(callback)=>{
+                    ConversationManager.TIMSetConvConversationGroupDeletedCallback().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err)
+                    })
+                }
+            },
+            {
+                name:"TIMSetConvConversationGroupNameChangedCallback",
+                action:(callback)=>{
+                    ConversationManager.TIMSetConvConversationGroupNameChangedCallback().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err)
+                    })
+                }
+            },
+            {
+                name:"TIMSetConvConversationsAddedToGroupCallback",
+                action:(callback)=>{
+                    ConversationManager.TIMSetConvConversationsAddedToGroupCallback().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err)
+                    })
+                }
+            },
+            {
+                name:"TIMSetConvConversationsDeletedFromGroupCallback",
+                action:(callback)=>{
+                    ConversationManager.TIMSetConvConversationsDeletedFromGroupCallback().then(data=>{
+                        callback(JSON.stringify(data))
+                    }).catch(err=>{
+                        callback(err)
+                    })
+                }
+            },
         ]
     },
     {
@@ -513,6 +676,7 @@ const APIS = [
                 name: "TIMGroupCreate",
                 action: (callback) => {
                     TimGroupManager.TIMGroupCreate().then(res => {
+                        console.log(JSON.stringify(res));
                         const {  json_param  } = res
                         console.log(json_param);
                         // const { create_group_result_groupid } = JSON.parse(json_param);
@@ -574,8 +738,9 @@ const APIS = [
                         if(data.json_param!=null){
                             const d = data.json_param
                         //  seq = JSON.parse(data.data.json_param).group_get_memeber_info_list_result_next_seq
-                        seq = d;
-                        console.log('本次获取数据',d.group_get_memeber_info_list_result_info_array.map((item)=>{ console.log(item.group_member_info_identifier);return item; }));
+    
+                        // seq = d;
+                        // console.log('本次获取数据',d.group_get_memeber_info_list_result_info_array.map((item)=>{ console.log(item.group_member_info_identifier);return item; }));
                         }  
                         callback(JSON.stringify(data))
 
@@ -749,6 +914,116 @@ const APIS = [
                 name: "TIMSetGroupTipsEventCallback",
                 action: (callback) => {
                     TimGroupManager.TIMSetGroupTipsEventCallback(callback).then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMGroupSetGroupCounters",
+                action: (callback) => {
+                    TimGroupManager.TIMGroupSetGroupCounters().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMGroupGetGroupCounters",
+                action: (callback) => {
+                    TimGroupManager.TIMGroupGetGroupCounters().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMGroupIncreaseGroupCounter",
+                action: (callback) => {
+                    TimGroupManager.TIMGroupIncreaseGroupCounter().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMGroupDecreaseGroupCounter",
+                action: (callback) => {
+                    TimGroupManager.TIMGroupDecreaseGroupCounter().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMGroupGetJoinedCommunityList",
+                action: (callback) => {
+                    TimGroupManager.TIMGroupGetJoinedCommunityList().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMGroupCreateTopicInCommunity",
+                action: (callback) => {
+                    TimGroupManager.TIMGroupCreateTopicInCommunity().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMGroupDeleteTopicFromCommunity",
+                action: (callback) => {
+                    TimGroupManager.TIMGroupDeleteTopicFromCommunity().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMGroupSetTopicInfo",
+                action: (callback) => {
+                    TimGroupManager.TIMGroupSetTopicInfo().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMGroupGetTopicInfoList",
+                action: (callback) => {
+                    TimGroupManager.TIMGroupGetTopicInfoList().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMSetGroupCounterChangedCallback",
+                action: (callback) => {
+                    TimGroupManager.TIMSetGroupCounterChangedCallback().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: "TIMSetGroupTopicCreatedCallback",
+                action: (callback) => {
+                    TimGroupManager.TIMSetGroupTopicCreatedCallback().then(data => {
                         callback(JSON.stringify(data))
                     }).catch(err => {
                         callback(err.toString())
@@ -1343,6 +1618,25 @@ const APIS = [
                 name:'TIMMsgSetOfflinePushToken',
                 action:(callback) => {
                     TimAdvanceMessageManager.TIMMsgSetOfflinePushToken().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })}
+            },
+            {
+                name:'TIMMsgTranslateText',
+                action:(callback) => {
+                    TimAdvanceMessageManager.TIMMsgTranslateText().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })}
+            }
+            ,
+            {
+                name:'TIMMsgConvertVoiceToText',
+                action:(callback) => {
+                    TimAdvanceMessageManager.TIMMsgConvertVoiceToText().then(data => {
                         callback(JSON.stringify(data))
                     }).catch(err => {
                         callback(err.toString())

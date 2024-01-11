@@ -1,12 +1,124 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
-<body>
-    test
-</body>
-</html>
+
+
+
+
+    
+    
+    
+    <style>
+        .plugin-container {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            align-items: stretch;
+            margin-top: 10px;
+        }
+        .plugin-container .plugin-item.none{
+            box-shadow: 0 0 10px rgba(255,255,255,1);
+        }
+        .plugin-container .plugin-item {
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            margin-right: 20px;
+            position: relative;
+            flex: 1;
+        }
+
+        .plugin-container .plugin-item .img img {
+            width: 100%;
+            height: auto;
+            cursor: pointer;
+            display: block;
+        }
+
+        .plugin-container .plugin-item .img {
+            display: block;
+        }
+
+        .plugin-container .plugin-item .text {
+            top: 4px;
+            right: 10px;
+            font-size: 12px;
+            text-decoration: none;
+            z-index: 100;
+            color: #3594f7;
+            position: absolute;
+        }
+
+        @media (max-width: 768px) {
+            .plugin-container {
+                flex-direction: column;
+            }
+
+            .plugin-container .plugin-item {
+                margin-right: 0;
+                margin-bottom: 20px;
+                flex: 1;
+            }
+        }
+    </style>
+
+
+
+    <div class="plugin-container">
+        <div class="plugin-item">
+            <a class="img" href="https://console.cloud.tencent.com/im/plugin/DesKKit" target="_blank">
+                <img src="https://markdown-1252238885.cos.ap-guangzhou.myqcloud.com/2023-09-01-100431.png" />
+            </a>
+            <a class="text" href="https://console.cloud.tencent.com/im/plugin/DesKKit" target="_blank">立即体验</a>
+        </div>
+        <div class="plugin-item">
+            <a class="img" href="https://console.cloud.tencent.com/im/plugin/TIMPush" target="_blank">
+                <img src="https://markdown-1252238885.cos.ap-guangzhou.myqcloud.com/2023-11-28-121712.png" />
+            </a>
+            <a class="text" href="https://console.cloud.tencent.com/im/plugin/TIMPush" target="_blank">立即体验</a>
+        </div>
+        <div class="plugin-item">
+            <a class="img" href="https://console.cloud.tencent.com/im/plugin/TUICloudSearch" target="_blank">
+                <img src="https://markdown-1252238885.cos.ap-guangzhou.myqcloud.com/2023-10-16-092120.png" />
+            </a>
+            <a class="text" href="https://console.cloud.tencent.com/im/plugin/TUICloudSearch" target="_blank">立即体验</a>
+        </div>
+        
+    </div>
+    <div class="plugin-container">
+       
+        <div class="plugin-item">
+            <a class="img" href="https://console.cloud.tencent.com/im/plugin/TUIConversationGroup" target="_blank">
+                <img src="https://markdown-1252238885.cos.ap-guangzhou.myqcloud.com/2023-07-13-133221.png" />
+            </a>
+            <a class="text" href="https://console.cloud.tencent.com/im/plugin/TUIConversationGroup" target="_blank">立即体验</a>
+        </div>
+        <div class="plugin-item">
+            <a class="img" href="https://console.cloud.tencent.com/im/plugin/TUIConversationMark" target="_blank">
+                <img src="https://markdown-1252238885.cos.ap-guangzhou.myqcloud.com/2023-07-13-133437.png" />
+            </a>
+            <a class="text" href="https://console.cloud.tencent.com/im/plugin/TUIConversationMark" target="_blank">立即体验</a>
+        </div>
+        <div class="plugin-item">
+            <a class="img" href="https://console.cloud.tencent.com/im/plugin/TUIPoll" target="_blank">
+                <img src="https://markdown-1252238885.cos.ap-guangzhou.myqcloud.com/2023-06-29-062916.png" />
+            </a>
+            <a class="text" href="https://console.cloud.tencent.com/im/plugin/TUIPoll" target="_blank">立即体验</a>
+        </div>
+        
+    </div>
+    <div class="plugin-container">
+        <div class="plugin-item">
+            <a class="img" href="https://console.cloud.tencent.com/im/plugin/TUIGroup" target="_blank">
+                <img src="https://markdown-1252238885.cos.ap-guangzhou.myqcloud.com/2023-06-29-062859.png" />
+            </a>
+            <a class="text" href="https://console.cloud.tencent.com/im/plugin/TUIGroup" target="_blank">立即体验</a>
+        </div>
+        <div class="plugin-item">
+            <a class="img" href="https://console.cloud.tencent.com/im/plugin/TUITranslation" target="_blank">
+                <img src="https://markdown-1252238885.cos.ap-guangzhou.myqcloud.com/2023-06-29-062930.png" />
+            </a>
+            <a class="text" href="https://console.cloud.tencent.com/im/plugin/TUITranslation" target="_blank">立即体验</a>
+        </div>
+         <div class="plugin-item none">
+             
+         </div>
+     </div>
+
+
+     

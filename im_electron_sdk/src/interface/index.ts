@@ -10,3 +10,4 @@ export * from "./friendshipInterface";
 export * from "./advanceMessageInterface";
 export * from "./trtcCalling";
 export * from "./conversationInterface";
+export * from "./signalingInterface";

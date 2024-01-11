@@ -19,8 +19,7 @@ function load(app) {
     app.converter.on(typedocInstance.Converter.EVENT_RESOLVE, (context,reflection,node) => {
         // console.log(app.options.getValue("myOption") )
         if (app.options.getValue("myOption") === "something") {
-            // ...
-            console.log("好耶好耶")
+           
         }
     });
     app.converter.on(typedocInstance.Converter.EVENT_RESOLVE_BEGIN,onResolveBegin.bind(void 0))

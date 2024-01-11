@@ -1,6 +1,6 @@
 // import { TIMConvType } from "../../../im_electron_sdk/dist/enums";
 import TimRender from "../../../im_electron_sdk/dist/renderer";
-import { setConvCustomDataParam,convCancelDraft, convCreate, convDelete, convGetConvInfo, convGetTotalUnreadMessageCount, convPinConversation, convSetDrat, convTotalUnreadMessageCountChangedCallbackParam, createConversationGroupParam, deleteConvGroupParam, getConvGroupList, getConvList, MarkConversationParam, renameConvGroupParam, setConvEventCallback, TIMConversationListFilter } from "../../../im_electron_sdk/dist/interfaces";
+import { setConvCustomDataParam,convCancelDraft, convCreate, convDelete, convGetConvInfo, convGetTotalUnreadMessageCount, convPinConversation, convSetDrat, convTotalUnreadMessageCountChangedCallbackParam, createConversationGroupParam, deleteConvGroupParam, getConvGroupList, getConvList, MarkConversationParam, renameConvGroupParam, setConvEventCallback, TIMConversationListFilter, DeleteConvListParam, CleanUnreadMessageCoutParam, convUnreadMessageCountChangedByFilterCallbackParam, convGroupCreatedCallbackParam, convGroupDeletedCallbackParam, convGroupNameChangedCallback } from "../../../im_electron_sdk/dist/interfaces";
 // import TimRender from "im_electron_sdk/dist/renderer";
 const timRenderInstance = new TimRender();
 const ConversationManager = {
@@ -19,6 +19,62 @@ const ConversationManager = {
             userData:'TIMConvDelete',
         }
         return timRenderInstance.TIMConvDelete(param)
+    },
+    TIMConvDeleteConversationList(){
+        let param:DeleteConvListParam = {
+            conversation_id_array: [
+                "c2c_test",
+            ],
+            clearMessage: false
+        }
+        return timRenderInstance.TIMConvDeleteConversationList(param)
+    },
+    TIMConvGetUnreadMessageCountByFilter(){
+        let param:TIMConversationListFilter = {
+            params: {
+                conversation_list_filter_conv_type:null,
+                conversation_list_filter_mark_type: 0x1,
+                conversation_list_filter_conversation_group: null
+            }
+        }
+        return timRenderInstance.TIMConvGetUnreadMessageCountByFilter(param)
+    },
+    TIMConvSubscribeUnreadMessageCountByFilter(){
+        let param:TIMConversationListFilter = {
+            params: {
+                conversation_list_filter_conv_type: 1,
+                conversation_list_filter_mark_type: 0x1,
+                conversation_list_filter_conversation_group: "c2c_im_demo_admin"
+            }
+        }
+        return timRenderInstance.TIMConvSubscribeUnreadMessageCountByFilter(param)
+    },
+    TIMConvUnsubscribeUnreadMessageCountByFilter(){
+        let param:TIMConversationListFilter = {
+            params: {
+                conversation_list_filter_conv_type: 1,
+                conversation_list_filter_mark_type: 0x1,
+                conversation_list_filter_conversation_group: "c2c_test"
+            }
+        }
+        return timRenderInstance.TIMConvUnsubscribeUnreadMessageCountByFilter(param)
+    },
+    TIMConvCleanConversationUnreadMessageCount(){
+        let param :CleanUnreadMessageCoutParam = {
+            conversation_id: "c2c_test",
+            clean_timestamp: 0,
+            clean_sequence: 0
+        }
+        return timRenderInstance.TIMConvCleanConversationUnreadMessageCount(param)
+    },
+    TIMSetConvUnreadMessageCountChangedByFilterCallback(){
+        let param:convUnreadMessageCountChangedByFilterCallbackParam = {
+            user_data:"",
+            callback:(...args)=>{
+                console.log(args)
+            }
+        }
+        return timRenderInstance.TIMSetConvUnreadMessageCountChangedByFilterCallback(param)
     },
     TIMConvGetConvList(){
         let param:getConvList = {
@@ -56,8 +112,8 @@ const ConversationManager = {
     TIMConvGetConvInfo(){
         let param:convGetConvInfo = {
             json_get_conv_list_param:[{
-                "get_conversation_list_param_conv_id":'6789',
-                "get_conversation_list_param_conv_type": 2
+                "get_conversation_list_param_conv_id":'10058198',
+                "get_conversation_list_param_conv_type": 1
             }],
             user_data:'TIMConvGetConvInfo', 
         }
@@ -65,10 +121,9 @@ const ConversationManager = {
     },
     TIMConvPinConversation(){
         let param:convPinConversation = {
-            convId:'6789',
+            convId:'10058198',
             convType:1,
             isPinned:true,
-            user_data:'TIMConvGetConvInfo', 
         }
         return timRenderInstance.TIMConvPinConversation(param)
     },
@@ -99,10 +154,10 @@ const ConversationManager = {
     TIMConvGetConversationListByFilter(){
         let param :TIMConversationListFilter = {
             params:{
-                conversation_list_filter_conv_type:2,
+                conversation_list_filter_conv_type:1,
                 conversation_list_filter_next_seq:0,
                 conversation_list_filter_count:20,
-                conversation_list_filter_mark_type:0x1,
+                conversation_list_filter_conversation_group:"hello"
             },
             user_data:""
         }
@@ -110,7 +165,7 @@ const ConversationManager = {
     },
     TIMConvMarkConversation(){
         let param:MarkConversationParam = {
-            conversation_id_array:["10043564"],
+            conversation_id_array:["c2c_im_demo_admin"],
             mark_type:0x1,
             enable_mark:true
         }
@@ -119,7 +174,7 @@ const ConversationManager = {
     TIMConvCreateConversationGroup(){
         let param:createConversationGroupParam={
             group_name:"hello",
-            conversation_id_array:["group_@TGS#2B6MQRSHD"],
+            conversation_id_array:["group_@TGS#172OQIUIO"],
         }
         return timRenderInstance.TIMConvCreateConversationGroup(param);
     },
@@ -145,7 +200,8 @@ const ConversationManager = {
     TIMConvAddConversationsToGroup(){
         let param:createConversationGroupParam={
             group_name:"hello",
-            conversation_id_array:["group_@TGS#2B6MQRSHD"],
+            conversation_id_array:["c2c_100058198"],
+            user_data:"1"
         }
         return timRenderInstance.TIMConvAddConversationsToGroup(param);
     },
@@ -162,6 +218,47 @@ const ConversationManager = {
             custom_data: "nihao"
         }
         return timRenderInstance.TIMConvSetConversationCustomData(param);
+    },
+    TIMSetConvConversationGroupCreatedCallback(){
+        let param:convGroupCreatedCallbackParam = {
+            callback:(...args) => {
+                console.log(args)
+                console.log("conversationGroupCreated")
+            }
+        }
+        return timRenderInstance.TIMSetConvConversationGroupCreatedCallback(param)
+    },
+    TIMSetConvConversationGroupDeletedCallback(){
+        let param :convGroupDeletedCallbackParam = {
+            callback:(...args) => {
+                console.log(args)
+            }
+        }
+        return timRenderInstance.TIMSetConvConversationGroupDeletedCallback(param)
+    },
+    TIMSetConvConversationGroupNameChangedCallback(){
+        let param : convGroupNameChangedCallback = {
+            callback:(...args) => {
+                console.log(args)
+            }
+        }
+        return timRenderInstance.TIMSetConvConversationGroupNameChangedCallback(param)
+    },
+    TIMSetConvConversationsAddedToGroupCallback(){
+        let param : convGroupCreatedCallbackParam = {
+            callback:(...args) => {
+                console.log(args)
+            }
+        }
+        return timRenderInstance.TIMSetConvConversationsAddedToGroupCallback(param)
+    },
+    TIMSetConvConversationsDeletedFromGroupCallback(){
+        let param : convGroupCreatedCallbackParam = {
+            callback:(...args) => {
+                console.log(args)
+            }
+        }
+        return timRenderInstance.TIMSetConvConversationsDeletedFromGroupCallback(param);
     }
 }
 export default ConversationManager;

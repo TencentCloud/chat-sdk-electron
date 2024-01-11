@@ -81,7 +81,6 @@
   "license": "CC0-1.0",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^22.0.2",
-    "electron": "^19.1.9",
     "electron-builder": "^23.0.3",
     "electron-devtools-installer": "^3.2.0",
     "husky": "^7.0.0",
@@ -89,6 +88,7 @@
     "prettier": "^2.3.2"
   },
   "dependencies": {
-    "im_electron_sdk": "2.0.2"
+    "electron": "^28.1.1",
+    "im_electron_sdk": "file:./im_electron_sdk"
   }
 }

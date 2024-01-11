@@ -140,20 +140,20 @@ interface GetBlackListParams {
 * @param user_data user_data: 用户自定义数据
 * ```
 *    params: {
-        friend_respone_identifier?: string; // 响应好友添加的UserID
-        friend_respone_action?: TIMFriendResponseAction; // 响应好友添加的动作
-        friend_respone_remark?: string; // 好友备注
-        friend_respone_group_name?: string; // 好友分组列表
+        friend_response_identifier?: string; // 响应好友添加的UserID
+        friend_response_action?: TIMFriendResponseAction; // 响应好友添加的动作
+        friend_response_remark?: string; // 好友备注
+        friend_response_group_name?: string; // 好友分组列表
     };
 *
 * ```
 */
 interface HandleFriendAddParams {
     params: {
-        friend_respone_identifier?: string;
-        friend_respone_action?: TIMFriendResponseAction;
-        friend_respone_remark?: string;
-        friend_respone_group_name?: string;
+        friend_response_identifier?: string;
+        friend_response_action?: TIMFriendResponseAction;
+        friend_response_remark?: string;
+        friend_response_group_name?: string;
     };
     user_data?: string;
 }
@@ -509,7 +509,7 @@ interface FriendGroupInfo {
 
 interface FriendAddPendencyInfo {
     friend_add_pendency_info_type: TIMFriendPendencyType;
-    friend_add_pendency_info_idenitifer: string;
+    friend_add_pendency_info_identifier: string;
     friend_add_pendency_info_nick_name: string;
     friend_add_pendency_info_add_time: number;
     friend_add_pendency_info_add_source: string;

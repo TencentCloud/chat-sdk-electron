@@ -16,7 +16,7 @@ const friendShipManager = {
     TIMFriendshipAddFriend: () => {
         let param:AddFriendParams = {
             params: {
-                friendship_add_friend_param_identifier: "100453631111",
+                friendship_add_friend_param_identifier: "",
                 friendship_add_friend_param_friend_type: 1,
                 friendship_add_friend_param_remark: "test_jinhui",
                 friendship_add_friend_param_group_name: "",
@@ -30,10 +30,10 @@ const friendShipManager = {
     TIMFriendshipHandleFriendAddRequest: () => {
         let param :HandleFriendAddParams = {
             params: {
-                friend_respone_identifier: "940928",
-                friend_respone_action: 1,
-                friend_respone_remark: "xx",
-                friend_respone_group_name: "xx",
+                friend_response_identifier: "940928",
+                friend_response_action: 1,
+                friend_response_remark: "xx",
+                friend_response_group_name: "xx",
             },
             user_data: "1234"
         }
@@ -42,10 +42,9 @@ const friendShipManager = {
     TIMFriendshipModifyFriendProfile: () => {
         let param : ModifyFriendProfileParams = {
             params: {
-                friendship_modify_friend_profile_param_identifier: "940928",
+                friendship_modify_friend_profile_param_identifier: "",
                 friendship_modify_friend_profile_param_item: {
                     friend_profile_item_remark: "xx",
-                    friend_profile_item_group_name_array: ["xx"], 
                 }
             },
             user_data: "1234"

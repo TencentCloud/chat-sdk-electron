@@ -2,14 +2,7 @@
  * 会话，即登录微信或 QQ 后首屏看到的一个个聊天会话，包含会话节点、会话名称、群名称、最后一条消息以及未读消息数等元素。
  * @module ConversationManager(会话相关接口)
  */
-import {
-    cache,
-    CommonCallbackFun,
-    commonResponse,
-    commonResult,
-    ErrorResponse,
-    sdkconfig,
-} from "../interface";
+import { commonResult, sdkconfig } from "../interface";
 import {
     convCreate,
     convDelete,
@@ -33,32 +26,29 @@ import {
     renameConvGroupParam,
     convGroupListResult,
     setConvCustomDataParam,
+    CleanUnreadMessageCoutParam,
+    DeleteConvListParam,
+    convUnreadMessageCountChangedByFilterCallbackParam,
+    convGroupCreatedCallbackParam,
+    convGroupDeletedCallbackParam,
+    convGroupNameChangedCallback,
 } from "../interface/conversationInterface";
-import {
-    jsFuncToFFIConvEventCallback,
-    jsFuncToFFIFun,
-    jsFunToFFITIMSetConvTotalUnreadMessageCountChangedCallback,
-    nodeStrigToCString,
-    randomString,
-} from "../utils/utils";
+
+const {
+    load,
+    DataType,
+
+    funcConstructor,
+} = require("ffi-rs");
+const libName = "libImSDK";
 
 class ConversationManager {
     private _sdkconfig: sdkconfig;
-    private _callback: Map<String, Function> = new Map();
-    private _ffiCallback: Map<String, Buffer> = new Map();
-    private _cache: Map<String, Map<string, cache>> = new Map();
-    private _globalUserData: Map<string, string> = new Map();
-    private stringFormator = (str: string | undefined): string =>
-        str ? nodeStrigToCString(str) : nodeStrigToCString("");
 
-    getErrorResponse(params: ErrorResponse) {
-        return {
-            code: params.code || -1,
-            desc: params.desc || "error",
-            json_params: params.json_params || "",
-            user_data: params.user_data || "",
-        };
+    setSDKAPPID(sdkappid: number) {
+        this._sdkconfig.sdkappid = sdkappid;
     }
+
     /** @internal */
     constructor(config: sdkconfig) {
         this._sdkconfig = config;
@@ -72,45 +62,52 @@ class ConversationManager {
      * > 会话是指面向一个人或者一个群组的对话，通过与单个人或群组之间会话收发消息
      * > 此接口创建或者获取会话信息，需要指定会话类型（群组或者单聊），以及会话对方标志（对方帐号或者群号）。会话信息通过cb回传。
      */
-    TIMConvCreate(param: convCreate): Promise<commonResult<convInfo>> {
-        const convId = nodeStrigToCString(param.convId);
-        const convType = param.convType;
-        const userData = param.userData
-            ? nodeStrigToCString(param.userData)
-            : nodeStrigToCString("");
+    TIMConvCreate(param: convCreate): Promise<commonResult<string>> {
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: convInfo =
-                    json_param == "" ? {} : JSON.parse(json_param);
-                if (code === 0) {
-                    resolve({ code, desc, json_param: param, user_data });
-                } else {
-                    reject({ code, desc, json_param: param, user_data });
-                }
-                this._cache.get("TIMConvCreate")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvCreate");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: cb,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvCreate",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.I32,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    param.convId,
+                    param.convType,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    param.userData ?? "",
+                ],
             });
-            this._cache.set("TIMConvCreate", cacheMap);
-            const code: number = this._sdkconfig.Imsdklib.TIMConvCreate(
-                convId,
-                convType,
-                this._cache.get("TIMConvCreate")?.get(now)?.callback,
-                userData
-            );
             code !== 0 && reject({ code });
         });
     }
@@ -123,42 +120,117 @@ class ConversationManager {
      * 此接口用于删除会话，删除会话是否成功通过回调返回。
      */
     TIMConvDelete(param: convDelete): Promise<commonResult<string>> {
-        const convId = nodeStrigToCString(param.convId);
-        const convType = param.convType;
-        const userData = param.userData
-            ? nodeStrigToCString(param.userData)
-            : nodeStrigToCString("");
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                if (code === 0) {
-                    resolve({ code, desc, json_param, user_data });
-                } else {
-                    reject({ code, desc, json_param, user_data });
-                }
-                this._cache.get("TIMConvDelete")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvDelete");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: cb,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvDelete",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.I32,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    param.convId,
+                    param.convType,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    param.userData ?? "",
+                ],
             });
-            this._cache.set("TIMConvDelete", cacheMap);
-            const code: number = this._sdkconfig.Imsdklib.TIMConvDelete(
-                convId,
-                convType,
-                this._cache.get("TIMConvDelete")?.get(now)?.callback,
-                userData
-            );
+            code !== 0 && reject({ code });
+        });
+    }
+    /**
+     * @brief 删除会话列表
+     * @note 请注意：每次最多支持删除100个会话
+     */
+    TIMConvDeleteConversationList(
+        param: DeleteConvListParam
+    ): Promise<commonResult<Array<TIMConversationOperationResult>>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMConvDeleteConversationList",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.Boolean,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(param.conversation_id_array),
+                    param.clearMessage,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<TIMConversationOperationResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param =
+                                    [] as Array<TIMConversationOperationResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    param.user_data ?? "",
+                ],
+            });
             code !== 0 && reject({ code });
         });
     }
@@ -173,48 +245,57 @@ class ConversationManager {
     async TIMConvGetConvList(
         param: getConvList
     ): Promise<commonResult<Array<convInfo>>> {
-        const userData = param.userData
-            ? nodeStrigToCString(param.userData)
-            : nodeStrigToCString("");
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let arrayparam: Array<convInfo>;
-                try {
-                    arrayparam = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    arrayparam = [] as Array<convInfo>;
-                }
-                if (code === 0) {
-                    resolve({ code, desc, json_param: arrayparam, user_data });
-                } else {
-                    reject({ code, desc, json_param: arrayparam, user_data });
-                }
-                this._cache.get("TIMConvGetConvList")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvGetConvList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: cb,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvGetConvList",
+                retType: DataType.I32,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let arrayparam: Array<convInfo>;
+                            try {
+                                arrayparam = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                arrayparam = [] as Array<convInfo>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: arrayparam,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    param.userData ?? "",
+                ],
             });
-            this._cache.set("TIMConvGetConvList", cacheMap);
-            const code: number = this._sdkconfig.Imsdklib.TIMConvGetConvList(
-                this._cache.get("TIMConvGetConvList")?.get(now)?.callback,
-                userData
-            );
             code !== 0 && reject({ code });
         });
     }
@@ -227,14 +308,18 @@ class ConversationManager {
      * 会话草稿一般用在保存用户当前输入的未发送的消息。
      */
     TIMConvSetDraft(param: convSetDrat): number {
-        const convId = nodeStrigToCString(param.convId);
-        const convType = param.convType;
-        const draftParam = nodeStrigToCString(JSON.stringify(param.draftParam));
-        return this._sdkconfig.Imsdklib.TIMConvSetDraft(
-            convId,
-            convType,
-            draftParam
-        );
+        const code = load({
+            library: libName,
+            funcName: "TIMConvSetDraft",
+            retType: DataType.I32,
+            paramsType: [DataType.String, DataType.I32, DataType.String],
+            paramsValue: [
+                param.convId,
+                param.convType,
+                JSON.stringify(param.draftParam),
+            ],
+        });
+        return code;
     }
     /**
      * ### 删除指定会话的草稿
@@ -246,9 +331,14 @@ class ConversationManager {
      * > 此接口创建或者获取会话信息，需要指定会话类型（群组或者单聊），以及会话对方标志（对方帐号或者群号）。会话信息通过cb回传。
      */
     TIMConvCancelDraft(param: convCancelDraft): number {
-        const convId = nodeStrigToCString(param.convId);
-        const convType = param.convType;
-        return this._sdkconfig.Imsdklib.TIMConvCancelDraft(convId, convType);
+        const code = load({
+            library: libName,
+            funcName: "TIMConvCancelDraft",
+            retType: DataType.I32,
+            paramsType: [DataType.String, DataType.I32],
+            paramsValue: [param.convId, param.convType],
+        });
+        return code;
     }
     /**
      * ### 获取指定会话列表
@@ -259,53 +349,59 @@ class ConversationManager {
     TIMConvGetConvInfo(
         param: convGetConvInfo
     ): Promise<commonResult<Array<convInfo>>> {
-        const convList = nodeStrigToCString(
-            JSON.stringify(param.json_get_conv_list_param)
-        );
-        const userData = param.user_data
-            ? nodeStrigToCString(param.user_data)
-            : nodeStrigToCString("");
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: Array<convInfo>;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<convInfo>;
-                }
-                if (code === 0) {
-                    resolve({ code, desc, json_param: param, user_data });
-                } else {
-                    reject({ code, desc, json_param: param, user_data });
-                }
-                this._cache.get("TIMConvGetConvInfo")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvGetConvInfo");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: cb,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvGetConvInfo",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(param.json_get_conv_list_param),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<convInfo>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<convInfo>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    param.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMConvGetConvInfo", cacheMap);
-            const code: number = this._sdkconfig.Imsdklib.TIMConvGetConvInfo(
-                convList,
-                this._cache.get("TIMConvGetConvInfo")?.get(now)?.callback,
-                userData
-            );
             code !== 0 && reject({ code });
         });
     }
@@ -318,46 +414,53 @@ class ConversationManager {
     TIMConvPinConversation(
         param: convPinConversation
     ): Promise<commonResult<string>> {
-        const convId = nodeStrigToCString(param.convId);
-        const convType = param.convType;
-        const isPinged = param.isPinned;
-        const userData = param.user_data
-            ? nodeStrigToCString(param.user_data)
-            : nodeStrigToCString("");
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                if (code === 0) {
-                    resolve({ code, desc, json_param, user_data });
-                } else {
-                    reject({ code, desc, json_param, user_data });
-                }
-                this._cache.get("TIMConvPinConversation")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvPinConversation");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: cb,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvPinConversation",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.I32,
+                    DataType.Boolean,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    param.convId,
+                    param.convType,
+                    param.isPinned,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    param.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMConvPinConversation", cacheMap);
-            const code: number =
-                this._sdkconfig.Imsdklib.TIMConvPinConversation(
-                    convId,
-                    convType,
-                    isPinged,
-                    this._cache.get("TIMConvPinConversation")?.get(now)
-                        ?.callback,
-                    userData
-                );
             code !== 0 && reject({ code });
         });
     }
@@ -370,53 +473,233 @@ class ConversationManager {
     TIMConvGetTotalUnreadMessageCount(
         param: convGetTotalUnreadMessageCount
     ): Promise<commonResult<totalUnreadCountResult>> {
-        const userData = param.user_data
-            ? nodeStrigToCString(param.user_data)
-            : nodeStrigToCString("");
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: totalUnreadCountResult;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify({})
-                    );
-                } catch {
-                    param = {} as totalUnreadCountResult;
-                }
-                if (code === 0) {
-                    resolve({ code, desc, json_param: param, user_data });
-                } else {
-                    reject({ code, desc, json_param: param, user_data });
-                }
-                this._cache
-                    .get("TIMConvGetTotalUnreadMessageCount")
-                    ?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvGetTotalUnreadMessageCount");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: cb,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvGetTotalUnreadMessageCount",
+                retType: DataType.I32,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: totalUnreadCountResult;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as totalUnreadCountResult;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    param.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMConvGetTotalUnreadMessageCount", cacheMap);
-            const code: number =
-                this._sdkconfig.Imsdklib.TIMConvGetTotalUnreadMessageCount(
-                    this._cache
-                        .get("TIMConvGetTotalUnreadMessageCount")
-                        ?.get(now)?.callback,
-                    userData
-                );
+            code !== 0 && reject({ code });
+        });
+    }
+    /**
+     * @brief 根据 filter 获取未读总数
+     * @note 未读总数会减去设置为免打扰的会话的未读数，即消息接收选项设置为 kTIMRecvMsgOpt_Not_Receive 或 kTIMRecvMsgOpt_Not_Notify 的会话。
+     * @param TIMConversationListFilter 中不要填写next_seq 和 count部分
+     */
+    TIMConvGetUnreadMessageCountByFilter(
+        unreadMessageCoutByFilterParam: TIMConversationListFilter
+    ): Promise<commonResult<totalUnreadCountResult>> {
+        const { params, user_data } = unreadMessageCoutByFilterParam;
+
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMConvGetUnreadMessageCountByFilter",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: totalUnreadCountResult;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as totalUnreadCountResult;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+    /**
+     * @brief 注册监听指定 filter 的会话未读总数变化
+     * @param TIMConversationListFilter 中不要填写next_seq 和 count部分
+     * @note
+     * - 当您调用这个接口以后，该 filter 下的未读数发生变化时，SDK 会给您抛 TIMSetConvUnreadMessageCountChangedByFilterCallback 注册的回调。
+     */
+    TIMConvSubscribeUnreadMessageCountByFilter(
+        subscribeParam: TIMConversationListFilter
+    ): number {
+        const { params } = subscribeParam;
+
+        const code = load({
+            library: libName,
+            funcName: "TIMConvSubscribeUnreadMessageCountByFilter",
+            retType: DataType.I32,
+            paramsType: [DataType.String],
+            paramsValue: [JSON.stringify(params)],
+        });
+        return code;
+    }
+    /**
+     * @brief 取消监听指定 filter 的会话未读总数变化
+     * @param TIMConversationListFilter 中不要填写next_seq 和 count部分
+     */
+    TIMConvUnsubscribeUnreadMessageCountByFilter(
+        unsubscribeParam: TIMConversationListFilter
+    ): number {
+        const { params } = unsubscribeParam;
+
+        const code = load({
+            library: libName,
+            funcName: "TIMConvUnsubscribeUnreadMessageCountByFilter",
+            retType: DataType.I32,
+            paramsType: [DataType.String],
+            paramsValue: [JSON.stringify(params)],
+        });
+        return code;
+    }
+    /**
+     * @brief 清理会话的未读消息计数
+     * @note
+     * - 当您想清理所有单聊会话的未读消息计数，conversation_id 请传入 "c2c"，即不指定具体的 userID；
+     * - 当您想清理所有群聊会话的未读消息计数，conversation_id 请传入 "group"，即不指定具体的 groupID；
+     * - 当您想清理所有会话的未读消息计数，conversation_id 请传入 "" 或者 nullptr；
+     * - 该接口调用成功后，SDK 会通过 onConversationChanged 回调将对应会话的最新未读数通知给您。
+     */
+    TIMConvCleanConversationUnreadMessageCount(
+        param: CleanUnreadMessageCoutParam
+    ): Promise<commonResult<Array<TIMConversationOperationResult>>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMConvCleanConversationUnreadMessageCount",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.I64,
+                    DataType.I64,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    param.conversation_id,
+                    param.clean_timestamp,
+                    param.clean_sequence,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<TIMConversationOperationResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param =
+                                    [] as Array<TIMConversationOperationResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    param.user_data ?? "",
+                ],
+            });
             code !== 0 && reject({ code });
         });
     }
@@ -430,64 +713,73 @@ class ConversationManager {
         convListByFilterparam: TIMConversationListFilter
     ): Promise<commonResult<TIMConversationListResult>> {
         const { params, user_data } = convListByFilterparam;
-        const c_user_data = this.stringFormator(user_data);
+        // const c_user_data = this.stringFormator(user_data);
         const seq = params.conversation_list_filter_next_seq ?? 0;
         const count = params.conversation_list_filter_count ?? 20;
         //@ts-ignore
         delete params.conversation_list_filter_next_seq;
         //@ts-ignore
         delete params.conversation_list_filter_count;
-        const c_params = this.stringFormator(JSON.stringify(params));
+        // const c_params = this.stringFormator(JSON.stringify(params));
 
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: TIMConversationListResult;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify({})
-                    );
-                } catch {
-                    param = {} as TIMConversationListResult;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache
-                    .get("TIMConvGetConversationListByFilter")
-                    ?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get(
-                "TIMConvGetConversationListByFilter"
-            );
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
-            });
-            this._cache.set("TIMConvGetConversationListByFilter", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMConvGetConversationListByFilter(
-                    c_params,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvGetConversationListByFilter",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.I64,
+                    DataType.I32,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(convListByFilterparam.params),
                     seq,
                     count,
-                    this._cache
-                        .get("TIMConvGetConversationListByFilter")
-                        ?.get(now)?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: TIMConversationListResult;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as TIMConversationListResult;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -504,52 +796,65 @@ class ConversationManager {
     TIMConvMarkConversation(
         markConvParam: MarkConversationParam
     ): Promise<commonResult<Array<TIMConversationOperationResult>>> {
-        const c_user_data = this.stringFormator(markConvParam.user_data);
-        const c_id_array = this.stringFormator(
-            JSON.stringify(markConvParam.conversation_id_array)
-        );
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<TIMConversationOperationResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<TIMConversationOperationResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMConvMarkConversation")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvMarkConversation");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvMarkConversation",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.I64,
+                    DataType.Boolean,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(markConvParam.conversation_id_array),
+                    markConvParam.mark_type,
+                    markConvParam.enable_mark,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<TIMConversationOperationResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param =
+                                    [] as Array<TIMConversationOperationResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    markConvParam.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMConvMarkConversation", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMConvMarkConversation(
-                c_id_array,
-                markConvParam["mark_type"],
-                markConvParam["enable_mark"],
-                this._cache.get("TIMConvMarkConversation")?.get(now)?.callback,
-                c_user_data
-            );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -561,58 +866,63 @@ class ConversationManager {
     TIMConvCreateConversationGroup(
         createConvGroupParam: createConversationGroupParam
     ): Promise<commonResult<Array<TIMConversationOperationResult>>> {
-        console.log(createConvGroupParam);
-        console.log("canshu");
-        const c_user_data = this.stringFormator(createConvGroupParam.user_data);
-        const c_id_array = this.stringFormator(
-            JSON.stringify(createConvGroupParam.conversation_id_array)
-        );
-        const c_group_name = this.stringFormator(
-            createConvGroupParam.group_name
-        );
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<TIMConversationOperationResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<TIMConversationOperationResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMConvCreateConversationGroup")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvCreateConversationGroup");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvCreateConversationGroup",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    createConvGroupParam.group_name,
+                    JSON.stringify(createConvGroupParam.conversation_id_array),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<TIMConversationOperationResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param =
+                                    [] as Array<TIMConversationOperationResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    createConvGroupParam.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMConvCreateConversationGroup", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMConvCreateConversationGroup(
-                    c_group_name,
-                    c_id_array,
-                    this._cache.get("TIMConvCreateConversationGroup")?.get(now)
-                        ?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -625,54 +935,61 @@ class ConversationManager {
     TIMConvGetConversationGroupList(
         getConvGroupListParam: getConvGroupList
     ): Promise<commonResult<convGroupListResult>> {
-        const c_user_data = this.stringFormator(
-            getConvGroupListParam.user_data
-        );
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<string>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<string>;
-                }
-                let result: convGroupListResult = {
-                    conv_group_array: param,
-                };
-
-                if (code === 0)
-                    resolve({ code, desc, json_params: result, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMConvGetConversationGroupList")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvGetConversationGroupList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvGetConversationGroupList",
+                retType: DataType.I32,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<string>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<string>;
+                            }
+                            let result: convGroupListResult = {
+                                conv_group_array: param,
+                            };
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: result,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    getConvGroupListParam.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMConvGetConversationGroupList", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMConvGetConversationGroupList(
-                    this._cache.get("TIMConvGetConversationGroupList")?.get(now)
-                        ?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -684,45 +1001,50 @@ class ConversationManager {
     TIMConvDeleteConversationGroup(
         param: deleteConvGroupParam
     ): Promise<commonResult<string>> {
-        const c_user_data = this.stringFormator(param.user_data);
-        const c_group_name = this.stringFormator(param.group_name);
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                if (code === 0)
-                    resolve({
-                        code,
-                        desc,
-                        json_params: json_params,
-                        user_data,
-                    });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMConvDeleteConversationGroup")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvDeleteConversationGroup");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvDeleteConversationGroup",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    param.group_name,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    param.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMConvDeleteConversationGroup", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMConvDeleteConversationGroup(
-                    c_group_name,
-                    this._cache.get("TIMConvDeleteConversationGroup")?.get(now)
-                        ?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -734,47 +1056,52 @@ class ConversationManager {
     TIMConvRenameConversationGroup(
         renameParam: renameConvGroupParam
     ): Promise<commonResult<string>> {
-        const c_user_data = this.stringFormator(renameParam.user_data);
-        const c_old_name = this.stringFormator(renameParam.old_name);
-        const c_new_name = this.stringFormator(renameParam.new_name);
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                if (code === 0)
-                    resolve({
-                        code,
-                        desc,
-                        json_params: json_params,
-                        user_data,
-                    });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMConvRenameConversationGroup")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvRenameConversationGroup");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvRenameConversationGroup",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    renameParam.old_name,
+                    renameParam.new_name,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    renameParam.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMConvRenameConversationGroup", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMConvRenameConversationGroup(
-                    c_old_name,
-                    c_new_name,
-                    this._cache.get("TIMConvRenameConversationGroup")?.get(now)
-                        ?.callback,
-                    c_user_data
-                );
-
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -786,56 +1113,64 @@ class ConversationManager {
     TIMConvAddConversationsToGroup(
         addConvToGroupParam: createConversationGroupParam
     ): Promise<commonResult<Array<TIMConversationOperationResult>>> {
-        const c_user_data = this.stringFormator(addConvToGroupParam.user_data);
-        const c_id_array = this.stringFormator(
-            JSON.stringify(addConvToGroupParam.conversation_id_array)
-        );
-        const c_group_name = this.stringFormator(
-            addConvToGroupParam.group_name
-        );
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<TIMConversationOperationResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<TIMConversationOperationResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache.get("TIMConvAddConversationsToGroup")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvAddConversationsToGroup");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvAddConversationsToGroup",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    addConvToGroupParam.group_name,
+                    JSON.stringify(addConvToGroupParam.conversation_id_array),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<TIMConversationOperationResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param =
+                                    [] as Array<TIMConversationOperationResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    addConvToGroupParam.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMConvAddConversationsToGroup", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMConvAddConversationsToGroup(
-                    c_group_name,
-                    c_id_array,
-                    this._cache.get("TIMConvAddConversationsToGroup")?.get(now)
-                        ?.callback,
-                    c_user_data
-                );
 
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -847,63 +1182,66 @@ class ConversationManager {
     TIMConvDeleteConversationsFromGroup(
         deleteConvFromGroupParam: createConversationGroupParam
     ): Promise<commonResult<Array<TIMConversationOperationResult>>> {
-        const c_user_data = this.stringFormator(
-            deleteConvFromGroupParam.user_data
-        );
-        const c_id_array = this.stringFormator(
-            JSON.stringify(deleteConvFromGroupParam.conversation_id_array)
-        );
-        const c_group_name = this.stringFormator(
-            deleteConvFromGroupParam.group_name
-        );
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<TIMConversationOperationResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<TIMConversationOperationResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache
-                    .get("TIMConvDeleteConversationsFromGroup")
-                    ?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get(
-                "TIMConvDeleteConversationsFromGroup"
-            );
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvDeleteConversationsFromGroup",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    deleteConvFromGroupParam.group_name,
+                    JSON.stringify(
+                        deleteConvFromGroupParam.conversation_id_array
+                    ),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<TIMConversationOperationResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param =
+                                    [] as Array<TIMConversationOperationResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    deleteConvFromGroupParam.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMConvDeleteConversationsFromGroup", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMConvDeleteConversationsFromGroup(
-                    c_group_name,
-                    c_id_array,
-                    this._cache
-                        .get("TIMConvDeleteConversationsFromGroup")
-                        ?.get(now)?.callback,
-                    c_user_data
-                );
 
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -915,88 +1253,69 @@ class ConversationManager {
     TIMConvSetConversationCustomData(
         setConvCustomDataParam: setConvCustomDataParam
     ): Promise<commonResult<Array<TIMConversationOperationResult>>> {
-        const c_user_data = this.stringFormator(
-            setConvCustomDataParam.user_data
-        );
-        const c_id_array = this.stringFormator(
-            JSON.stringify(setConvCustomDataParam.conversation_id_array)
-        );
-        const c_custom_data = this.stringFormator(
-            setConvCustomDataParam.custom_data
-        );
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_params,
-                user_data
-            ) => {
-                let param: Array<TIMConversationOperationResult>;
-                try {
-                    param = JSON.parse(
-                        json_params.trim().length > 0
-                            ? json_params.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<TIMConversationOperationResult>;
-                }
-                if (code === 0)
-                    resolve({ code, desc, json_params: param, user_data });
-                else reject(this.getErrorResponse({ code, desc }));
-                this._cache
-                    .get("TIMConvSetConversationCustomData")
-                    ?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMConvSetConversationCustomData");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb,
-                callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMConvSetConversationCustomData",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(
+                        setConvCustomDataParam.conversation_id_array
+                    ),
+                    setConvCustomDataParam.custom_data,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<TIMConversationOperationResult>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param =
+                                    [] as Array<TIMConversationOperationResult>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    setConvCustomDataParam.user_data ?? "",
+                ],
             });
-            this._cache.set("TIMConvSetConversationCustomData", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMConvSetConversationCustomData(
-                    c_id_array,
-                    c_custom_data,
-                    this._cache
-                        .get("TIMConvSetConversationCustomData")
-                        ?.get(now)?.callback,
-                    c_user_data
-                );
 
-            code !== 0 && reject(this.getErrorResponse({ code }));
+            code !== 0 && reject({ code });
         });
     }
 
-    setSDKAPPID(sdkappid: number) {
-        this._sdkconfig.sdkappid = sdkappid;
-    }
-    private setConvEventCallback(
-        conv_event: number,
-        json_conv_array: string,
-        user_data: string
-    ) {
-        const fn = this._callback.get("TIMSetConvEventCallback");
-        const us = this._globalUserData.get("TIMSetConvEventCallback");
-        fn && fn(conv_event, json_conv_array, us);
-    }
-    private convTotalUnreadMessageCountChangedCallback(
-        total_unread_count: number,
-        user_data: string
-    ) {
-        const fn = this._callback.get(
-            "TIMSetConvTotalUnreadMessageCountChangedCallback"
-        );
-        const us = this._globalUserData.get(
-            "TIMSetConvTotalUnreadMessageCountChangedCallback"
-        );
-        fn && fn(total_unread_count, us);
-    }
     // TODO这个参数有问题
     /**
      * ### 设置会话事件回调
@@ -1015,19 +1334,26 @@ class ConversationManager {
      * 调用接口[TIMConvDelete]()删除会话成功时会触发会话删除事件。
      */
     async TIMSetConvEventCallback(param: setConvEventCallback): Promise<any> {
-        this._callback.set("TIMSetConvEventCallback", param.callback);
-        const c_callback = jsFuncToFFIConvEventCallback(
-            this.setConvEventCallback.bind(this)
-        );
-        this._ffiCallback.set("TIMSetConvEventCallback", c_callback);
-        const userData = param.user_data
-            ? nodeStrigToCString(param.user_data)
-            : nodeStrigToCString("");
-        this._globalUserData.set("TIMSetConvEventCallback", userData);
-        this._sdkconfig.Imsdklib.TIMSetConvEventCallback(
-            this._ffiCallback.get("TIMSetConvEventCallback") as Buffer,
-            userData
-        );
+        const { callback } = param;
+        load({
+            library: libName,
+            funcName: "TIMSetConvEventCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [
+                              DataType.I32,
+                              DataType.String,
+                              DataType.String,
+                          ],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, param.user_data ?? ""],
+        });
     }
     /**
      * ### 设置会话未读消息总数变更的回调
@@ -1039,31 +1365,190 @@ class ConversationManager {
     async TIMSetConvTotalUnreadMessageCountChangedCallback(
         param: convTotalUnreadMessageCountChangedCallbackParam
     ) {
-        const userData = param.user_data
-            ? nodeStrigToCString(param.user_data)
-            : nodeStrigToCString("");
-        const c_callback =
-            jsFunToFFITIMSetConvTotalUnreadMessageCountChangedCallback(
-                this.convTotalUnreadMessageCountChangedCallback.bind(this)
-            );
-        this._ffiCallback.set(
-            "TIMSetConvTotalUnreadMessageCountChangedCallback",
-            c_callback
-        );
-        this._callback.set(
-            "TIMSetConvTotalUnreadMessageCountChangedCallback",
-            param.callback
-        );
-        this._globalUserData.set(
-            "TIMSetConvTotalUnreadMessageCountChangedCallback",
-            userData
-        );
-        this._sdkconfig.Imsdklib.TIMSetConvTotalUnreadMessageCountChangedCallback(
-            this._ffiCallback.get(
-                "TIMSetConvTotalUnreadMessageCountChangedCallback"
-            ) as Buffer,
-            userData
-        );
+        const { callback } = param;
+
+        load({
+            library: libName,
+            funcName: "TIMSetConvTotalUnreadMessageCountChangedCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [DataType.I32, DataType.String],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, param.user_data ?? ""],
+        });
+    }
+    /**
+     * @brief 设置按会话 filter 过滤的未读消息总数变更的回调
+     * @note
+     * - 您可以调用 subscribeUnreadMessageCountByFilter 注册监听指定 filter 下的未读总数变化，SDK 通过这个回调把最新的未读总数通知给您。
+     * - 您可以注册监听多个不同 filter 下的未读总数变更，这个回调的 filter 参数就是注册监听时指定的 filter，该 filter 携带了 kTIMConversationListFilterConvType、kTIMConversationListFilterMarkType、kTIMConversationListFilterGroupName 三个字段，通过判断这三字段是不是都相同，来区分出不同的 filter。
+     * - 未读总数会减去设置为免打扰的会话的未读数，即消息接收选项设置为 kTIMRecvMsgOpt_Not_Receive 或 kTIMRecvMsgOpt_Not_Notify 的会话。
+     */
+    async TIMSetConvUnreadMessageCountChangedByFilterCallback(
+        param: convUnreadMessageCountChangedByFilterCallbackParam
+    ) {
+        const { callback } = param;
+
+        load({
+            library: libName,
+            funcName: "TIMSetConvUnreadMessageCountChangedByFilterCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [
+                              DataType.String,
+                              DataType.I32,
+                              DataType.String,
+                          ],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, param.user_data ?? ""],
+        });
+    }
+    /**
+     * @brief 会话分组被创建回调
+     */
+    async TIMSetConvConversationGroupCreatedCallback(
+        param: convGroupCreatedCallbackParam
+    ) {
+        const { callback } = param;
+        load({
+            library: libName,
+            funcName: "TIMSetConvConversationGroupCreatedCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [
+                              DataType.String,
+                              DataType.String,
+                              DataType.String,
+                          ],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, param.user_data ?? ""],
+        });
+    }
+    /**
+     * @brief 会话分组被删除回调
+     */
+    async TIMSetConvConversationGroupDeletedCallback(
+        param: convGroupDeletedCallbackParam
+    ) {
+        const { callback } = param;
+
+        load({
+            library: libName,
+            funcName: "TIMSetConvConversationGroupDeletedCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [DataType.String, DataType.String],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, param.user_data ?? ""],
+        });
+    }
+    /**
+     * @brief 会话分组名变更回调
+     */
+    async TIMSetConvConversationGroupNameChangedCallback(
+        param: convGroupNameChangedCallback
+    ) {
+        const { callback } = param;
+
+        load({
+            library: libName,
+            funcName: "TIMSetConvConversationGroupNameChangedCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [
+                              DataType.String,
+                              DataType.String,
+                              DataType.String,
+                          ],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, param.user_data ?? ""],
+        });
+    }
+    /**
+     * @brief 会话分组新增会话回调
+     */
+    async TIMSetConvConversationsAddedToGroupCallback(
+        param: convGroupCreatedCallbackParam
+    ) {
+        const { callback } = param;
+
+        load({
+            library: libName,
+            funcName: "TIMSetConvConversationsAddedToGroupCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [
+                              DataType.String,
+                              DataType.String,
+                              DataType.String,
+                          ],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, param.user_data ?? ""],
+        });
+    }
+    /**
+     * @brief 会话分组删除会话回调
+     */
+    async TIMSetConvConversationsDeletedFromGroupCallback(
+        param: convGroupCreatedCallbackParam
+    ) {
+        const { callback } = param;
+
+        load({
+            library: libName,
+            funcName: "TIMSetConvConversationsDeletedFromGroupCallback",
+            retType: DataType.Void,
+            paramsType: [
+                callback == null
+                    ? DataType.Void
+                    : funcConstructor({
+                          paramsType: [
+                              DataType.String,
+                              DataType.String,
+                              DataType.String,
+                          ],
+                          permanent: true,
+                      }),
+                DataType.String,
+            ],
+            paramsValue: [callback, param.user_data ?? ""],
+        });
     }
 }
 export default ConversationManager;

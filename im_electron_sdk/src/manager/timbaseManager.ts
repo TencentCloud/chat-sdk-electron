@@ -3,11 +3,7 @@
  * @module TimbaseManager(基础接口)
  */
 import {
-    cache,
     callExperimentalAPIParam,
-    CommonCallbackFun,
-    commonResponse,
-    getLoginUserIDParam,
     loginParam,
     logoutParam,
     sdkconfig,
@@ -20,46 +16,84 @@ import {
     TIMSetUserSigExpiredCallbackParam,
     userProfile,
 } from "../interface";
-import { commonResult, initParam } from "../interface/basicInterface";
-import path from "path";
 import {
-    jsFuncToFFIFun,
-    jsFunToFFITIMSetKickedOfflineCallback,
-    jsFunToFFITIMSetNetworkStatusListenerCallback,
-    jsFunToFFITIMSetUserSigExpiredCallback,
-    nodeStrigToCString,
-    randomString,
-    transferTIMLogCallbackFun,
-} from "../utils/utils";
-import { TIMInternalOperation, TIMLoginStatus } from "../enum";
+    commonResult,
+    initParam,
+    setSelfStatusParam,
+    SubscribeUserInfoParam,
+    TIMSetSelfInfoUpdatedCallbackParam,
+    TIMSetUserStatusChangedCallbackParam,
+    UserInfoChangedCallbackParam,
+    userStatus,
+    userStatusParam,
+} from "../interface/basicInterface";
+import path from "path";
+
+import { TIMLoginStatus } from "../enum";
 import os from "os";
 import fs from "fs";
-// import log from "../utils/log";
-const ffi = require("ffi-napi");
-const voidPtrType = function () {
-    return ffi.types.CString;
-};
-const charPtrType = function () {
-    return ffi.types.CString;
-};
-const int32Type = function () {
-    return ffi.types.int32;
-};
-const voidType = function () {
-    return ffi.types.void;
-};
-const log = {
-    info: function (...args: any) {},
-    error: function (...args: any) {},
-};
+import { getFFIPath } from "../utils/utils";
+
+const ffiPath = getFFIPath();
+
+console.log(`current native sdk path is ${ffiPath}`);
+
+const { load, DataType, open, funcConstructor } = require("ffi-rs");
+
+const libName = "libImSDK";
+
+open({
+    library: libName, // key
+    path: ffiPath, // path
+});
+
 class TimbaseManager {
+    private _tag = "TencentCloudChat";
     private _sdkconfig: sdkconfig;
-    private _callback: Map<String, Function> = new Map();
-    private _ffiCallback: Map<String, Buffer> = new Map();
-    private _cache: Map<String, Map<string, cache>> = new Map();
+    static _electron_log: boolean = false;
     /** @internal */
     constructor(config: sdkconfig) {
         this._sdkconfig = config;
+    }
+    static _writeLog(log: string, funName?: string) {
+        if (!TimbaseManager._electron_log) {
+            return;
+        }
+        var timmer = setTimeout(() => {
+            load({
+                library: libName,
+                funcName: "callExperimentalAPI",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify({
+                        request_internal_operation:
+                            "internal_operation_write_log",
+                        request_write_log_log_level_param: 4,
+                        request_write_log_log_content_param: log,
+                        request_write_log_file_name_param:
+                            "im_electron_sdk_log",
+                        request_write_log_func_name_param:
+                            funName ?? "ElectronParse",
+                    }),
+                    () => {},
+                    "",
+                ],
+            });
+            clearTimeout(timmer);
+        }, 300);
     }
     /**
      * @brief ImSDK初始化
@@ -72,11 +106,12 @@ class TimbaseManager {
      */
     TIMInit(initParams?: initParam): Promise<number> {
         let sdkconfig: string;
-        const { config_path } = initParams || {};
+        const { config_path, electron_log = false } = initParams || {};
+
+        TimbaseManager._electron_log = electron_log;
         if (config_path) {
             const res = fs.statSync(config_path);
             if (!res.isDirectory()) {
-                log.info(`${config_path} is not a validate directory`);
                 return Promise.resolve(-1);
             }
         }
@@ -88,19 +123,46 @@ class TimbaseManager {
                 ? path.resolve(config_path, "sdk-config")
                 : path.resolve(os.homedir(), ".tencent-im/sdk-config"),
         });
+        console.log(this._tag, `curreng sdkappid ${this._sdkconfig.sdkappid}`);
+        console.log(this._tag, "current init config", sdkconfig);
+        var version = this.TIMGetSDKVersion();
+        console.log(this._tag, `current native sdk version is ${version}`);
         return new Promise(async resolve => {
-            const data = await this.callExperimentalAPI({
-                json_param: {
-                    request_internal_operation:
-                        TIMInternalOperation.kTIMInternalOperationSetUIPlatform,
-                    request_set_ui_platform_param: 7,
-                },
+            load({
+                library: libName,
+                funcName: "callExperimentalAPI",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify({
+                        request_internal_operation:
+                            "internal_operation_set_ui_platform",
+                        request_set_ui_platform_param: 7,
+                    }),
+                    () => {},
+                    "",
+                ],
             });
-            const res: number = this._sdkconfig.Imsdklib.TIMInit(
-                this._sdkconfig.sdkappid,
-                nodeStrigToCString(sdkconfig)
-            );
-            resolve(res);
+            const TIMInitRs = load({
+                library: libName,
+                funcName: "TIMInit",
+                retType: DataType.I32,
+                paramsType: [DataType.I64, DataType.String],
+                paramsValue: [this._sdkconfig.sdkappid, sdkconfig],
+            });
+            resolve(TIMInitRs);
         });
     }
     setSDKAPPID(sdkappid: number) {
@@ -114,15 +176,27 @@ class TimbaseManager {
      * 卸载DLL或退出进程前需要此接口卸载ImSDK，清理ImSDK相关资源
      */
     TIMUninit(): number {
-        return this._sdkconfig.Imsdklib.TIMUninit();
+        return load({
+            library: libName,
+            funcName: "TIMUninit",
+            retType: DataType.I32,
+            paramsType: [],
+            paramsValue: [],
+        });
     }
     /**
      * @brief 获取ImSDK版本号
      * @category SDK相关(如初始化)
      * @return  String 返回ImSDK的版本号
      */
-    TIMGetSDKVersion(): Buffer {
-        return this._sdkconfig.Imsdklib.TIMGetSDKVersion();
+    TIMGetSDKVersion(): String {
+        return load({
+            library: libName,
+            funcName: "TIMGetSDKVersion",
+            retType: DataType.String,
+            paramsType: [],
+            paramsValue: [],
+        });
     }
 
     /**
@@ -133,7 +207,13 @@ class TimbaseManager {
      * 可用于信令离线推送场景下超时判断
      */
     TIMGetServerTime(): number {
-        return this._sdkconfig.Imsdklib.TIMGetServerTime();
+        return load({
+            library: libName,
+            funcName: "TIMGetServerTime",
+            retType: DataType.I64,
+            paramsType: [],
+            paramsValue: [],
+        });
     }
     /**
      * ### 登录
@@ -145,40 +225,48 @@ class TimbaseManager {
      * 用户登录腾讯后台服务器后才能正常收发消息，登录需要用户提供UserID、UserSig等信息，具体含义请参考[登录鉴权](https://cloud.tencent.com/document/product/269/31999)
      */
     TIMLogin(param: loginParam): Promise<commonResult<string>> {
-        const userID = nodeStrigToCString(param.userID);
-        const userSig = nodeStrigToCString(param.userSig);
-        const userData = param.userData
-            ? nodeStrigToCString(param.userData)
-            : nodeStrigToCString("");
-
         return new Promise((resolve, reject) => {
-            const code: number = this._sdkconfig.Imsdklib.TIMLogin(
-                userID,
-                userSig,
-                this.jsFuncToFFIFun(resolve, reject),
-                userData
-            );
+            const code = load({
+                library: libName,
+                funcName: "TIMLogin",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    param.userID,
+                    param.userSig,
+                    (...args: any) => {
+                        const [
+                            code,
+                            desc = "",
+                            json_param = "",
+                            user_data = "",
+                        ] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    param.userData ?? "",
+                ],
+            });
             code !== 0 && reject({ code });
         });
     }
-    jsFuncToFFIFun(resolve: any, reject: any) {
-        return ffi.Callback(
-            voidType(),
-            [int32Type(), charPtrType(), charPtrType(), voidPtrType()],
-            function (
-                code: number,
-                desc: string,
-                json_param: string,
-                user_data?: any
-            ) {
-                if (code === 0) {
-                    resolve({ code, desc, json_param, user_data });
-                } else {
-                    reject({ code, desc, json_param, user_data });
-                }
-            }
-        );
-    }
+
     /**
      * @brief  登出
      * @category 登录相关
@@ -188,39 +276,37 @@ class TimbaseManager {
      * 如用户主动登出或需要进行用户的切换，则需要调用登出操作
      */
     TIMLogout(param: logoutParam): Promise<commonResult<string>> {
-        const userData = param.userData
-            ? nodeStrigToCString(param.userData)
-            : nodeStrigToCString("");
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                if (code === 0) {
-                    resolve({ code, desc, json_param, user_data });
-                } else {
-                    reject({ code, desc, json_param, user_data });
-                }
-                this._cache.get("TIMLogout")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMLogout");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: cb,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMLogout",
+                retType: DataType.Void,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    param.userData ?? "",
+                ],
             });
-            this._cache.set("TIMLogout", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMLogout(
-                this._cache.get("TIMLogout")?.get(now)?.callback,
-                userData
-            );
             code !== 0 && reject({ code });
+            resolve({ code: 0 });
         });
     }
     /**
@@ -232,7 +318,13 @@ class TimbaseManager {
      * 如果用户已经处于已登录和登录中状态，请勿再频繁调用登录接口登录
      */
     TIMGetLoginStatus(): TIMLoginStatus {
-        return this._sdkconfig.Imsdklib.TIMGetLoginStatus();
+        return load({
+            library: libName,
+            funcName: "TIMGetLoginStatus",
+            retType: DataType.I32,
+            paramsType: [],
+            paramsValue: [],
+        });
     }
     /**
      * @brief 获取登陆用户的 userid
@@ -244,37 +336,24 @@ class TimbaseManager {
     TIMGetLoginUserID(): Promise<commonResult<string>> {
         return new Promise((resolve, reject) => {
             const user_id_buffer = Buffer.alloc(128);
-            const code =
-                this._sdkconfig.Imsdklib.TIMGetLoginUserID(user_id_buffer);
-            code !== 0 && reject({ code });
-            resolve({
-                code,
-                json_param: user_id_buffer.toString().split("\u0000")[0],
-                desc: "",
-                user_data: "",
+            const code = load({
+                library: libName,
+                funcName: "TIMGetLoginUserID",
+                retType: DataType.I32,
+                paramsType: [DataType.U8Array],
+                paramsValue: [user_id_buffer],
             });
+            if (code == 0) {
+                resolve({
+                    code,
+                    json_param: user_id_buffer.toString().split("\u0000")[0],
+                    desc: "",
+                    user_data: "",
+                });
+            } else {
+                reject({ code });
+            }
         });
-    }
-    private networkStatusListenerCallback(
-        status: number,
-        code: number,
-        desc: string,
-        user_data: string
-    ) {
-        const fn = this._callback.get("TIMSetNetworkStatusListenerCallback");
-        fn && fn(status, code, desc, user_data);
-    }
-    private kickedOfflineCallback(user_data: string) {
-        const fn = this._callback.get("TIMSetKickedOfflineCallback");
-        fn && fn(user_data);
-    }
-    private userSigExpiredCallback(user_data: string) {
-        const fn = this._callback.get("TIMSetUserSigExpiredCallback");
-        fn && fn(user_data);
-    }
-    private logCallback(level: number, log: string, user_data: string) {
-        const fn = this._callback.get("TIMSetLogCallback");
-        fn && fn(level, log, user_data);
     }
     /**
      * ### 设置网络连接状态监听回调
@@ -290,26 +369,35 @@ class TimbaseManager {
     TIMSetNetworkStatusListenerCallback(
         param: TIMSetNetworkStatusListenerCallbackParam
     ) {
-        const userData = param.userData
-            ? nodeStrigToCString(param.userData)
-            : nodeStrigToCString("");
-        const c_callback = jsFunToFFITIMSetNetworkStatusListenerCallback(
-            this.networkStatusListenerCallback.bind(this)
-        );
-        this._callback.set(
-            "TIMSetNetworkStatusListenerCallback",
-            param.callback
-        );
-        this._ffiCallback.set(
-            "TIMSetNetworkStatusListenerCallback",
-            c_callback
-        );
-        this._sdkconfig.Imsdklib.TIMSetNetworkStatusListenerCallback(
-            this._ffiCallback.get(
-                "TIMSetNetworkStatusListenerCallback"
-            ) as Buffer,
-            userData
-        );
+        const { callback } = param;
+        if (callback != null) {
+            load({
+                library: libName,
+                funcName: "TIMSetNetworkStatusListenerCallback",
+                retType: DataType.Void,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        permanent: true,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [callback, param.userData],
+            });
+        } else {
+            load({
+                library: libName,
+                funcName: "TIMSetNetworkStatusListenerCallback",
+                retType: DataType.Void,
+                paramsType: [DataType.Void, DataType.String],
+                paramsValue: [null, param.userData],
+            });
+        }
     }
     /**
      *  ### 设置被踢下线通知回调
@@ -328,18 +416,35 @@ class TimbaseManager {
      *    如果需要，则再次调用login强制上线，设备2的登录的实例将会收到 TIMKickedOfflineCallback 回调。
      */
     TIMSetKickedOfflineCallback(param: TIMSetKickedOfflineCallbackParam) {
-        const userData = param.userData
-            ? nodeStrigToCString(param.userData)
-            : nodeStrigToCString("");
-        const c_callback = jsFunToFFITIMSetKickedOfflineCallback(
-            this.kickedOfflineCallback.bind(this)
-        );
-        this._callback.set("TIMSetKickedOfflineCallback", param.callback);
-        this._ffiCallback.set("TIMSetKickedOfflineCallback", c_callback);
-        this._sdkconfig.Imsdklib.TIMSetKickedOfflineCallback(
-            this._ffiCallback.get("TIMSetKickedOfflineCallback") as Buffer,
-            userData
-        );
+        const { callback } = param;
+        if (callback != null) {
+            load({
+                library: libName,
+                funcName: "TIMSetKickedOfflineCallback",
+                retType: DataType.Void,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        permanent: true,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [callback, param.userData],
+            });
+        } else {
+            load({
+                library: libName,
+                funcName: "TIMSetKickedOfflineCallback",
+                retType: DataType.Void,
+                paramsType: [DataType.Void, DataType.String],
+                paramsValue: [null, param.userData],
+            });
+        }
     }
 
     /**
@@ -351,18 +456,89 @@ class TimbaseManager {
      * [TIMLogin](./manager_timbasemanager.default.html#timlogin)也将会返回70001错误码。开发者可根据错误码或者票据过期回调进行票据更换
      */
     TIMSetUserSigExpiredCallback(param: TIMSetUserSigExpiredCallbackParam) {
-        const userData = param.userData
-            ? nodeStrigToCString(param.userData)
-            : nodeStrigToCString("");
-        const c_callback = jsFunToFFITIMSetUserSigExpiredCallback(
-            this.userSigExpiredCallback.bind(this)
-        );
-        this._callback.set("TIMSetUserSigExpiredCallback", param.callback);
-        this._ffiCallback.set("TIMSetUserSigExpiredCallback", c_callback);
-        this._sdkconfig.Imsdklib.TIMSetUserSigExpiredCallback(
-            this._ffiCallback.get("TIMSetUserSigExpiredCallback") as Buffer,
-            userData
-        );
+        const { callback } = param;
+        if (callback != null) {
+            load({
+                library: libName,
+                funcName: "TIMSetUserSigExpiredCallback",
+                retType: DataType.Void,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [DataType.String],
+                        permanent: true,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [callback, param.userData],
+            });
+        } else {
+            load({
+                library: libName,
+                funcName: "TIMSetUserSigExpiredCallback",
+                retType: DataType.Void,
+                paramsType: [DataType.Void, DataType.String],
+                paramsValue: [null, param.userData],
+            });
+        }
+    }
+    /**
+     * @brief 当前用户的资料发生了更新
+     * @param TIMSetSelfInfoUpdatedCallbackParam
+     */
+    TIMSetSelfInfoUpdatedCallback(param: TIMSetSelfInfoUpdatedCallbackParam) {
+        const { callback } = param;
+        if (callback != null) {
+            load({
+                library: libName,
+                funcName: "TIMSetSelfInfoUpdatedCallback",
+                retType: DataType.Void,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [DataType.String, DataType.String],
+                        permanent: true,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [callback, param.user_data ?? ""],
+            });
+        } else {
+            load({
+                library: libName,
+                funcName: "TIMSetSelfInfoUpdatedCallback",
+                retType: DataType.Void,
+                paramsType: [DataType.Void, DataType.String],
+                paramsValue: [null, param.user_data ?? ""],
+            });
+        }
+    }
+
+    TIMSetUserStatusChangedCallback(
+        param: TIMSetUserStatusChangedCallbackParam
+    ) {
+        const { callback } = param;
+        if (callback != null) {
+            load({
+                library: libName,
+                funcName: "TIMSetUserStatusChangedCallback",
+                retType: DataType.Void,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [DataType.String, DataType.String],
+                        permanent: true,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [callback, param.user_data ?? ""],
+            });
+        } else {
+            load({
+                library: libName,
+                funcName: "TIMSetUserStatusChangedCallback",
+                retType: DataType.Void,
+                paramsType: [DataType.Void, DataType.String],
+                paramsValue: [null, param.user_data ?? ""],
+            });
+        }
     }
     /**
      * ### 设置日志回调
@@ -374,18 +550,34 @@ class TimbaseManager {
      */
     // doc TODO 文档还需测试
     TIMSetLogCallback(param: TIMSetLogCallbackParam) {
-        const user_data = param.user_data
-            ? nodeStrigToCString(param.user_data)
-            : nodeStrigToCString("");
-        const c_callback = transferTIMLogCallbackFun(
-            this.logCallback.bind(this)
-        );
-        this._callback.set("TIMSetLogCallback", param.callback);
-        this._ffiCallback.set("TIMSetLogCallback", c_callback);
-        this._sdkconfig.Imsdklib.TIMSetLogCallback(
-            this._ffiCallback.get("TIMSetLogCallback") as Buffer,
-            user_data
-        );
+        const { callback } = param;
+        if (callback != null) {
+            load({
+                library: libName,
+                funcName: "TIMSetLogCallback",
+                retType: DataType.Void,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        permanent: true,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [callback, param.user_data ?? ""],
+            });
+        } else {
+            load({
+                library: libName,
+                funcName: "TIMSetLogCallback",
+                retType: DataType.Void,
+                paramsType: [DataType.Void, DataType.String],
+                paramsValue: [null, param.user_data ?? ""],
+            });
+        }
     }
     /**
      * @brief  设置额外的用户配置
@@ -398,43 +590,37 @@ class TimbaseManager {
      * 每项配置可以单独设置，也可以一起配置,详情请参考 [SetConfig](./manager_timbasemanager.default.html#timsetconfig)。
      */
     TIMSetConfig(param: TIMSetConfigParam) {
-        const user_data = param.user_data
-            ? nodeStrigToCString(param.user_data)
-            : nodeStrigToCString("");
-        const json_config = nodeStrigToCString(
-            JSON.stringify(param.json_config)
-        );
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                if (code === 0) {
-                    resolve({ code, desc, json_param, user_data });
-                } else {
-                    reject({ code, desc, json_param, user_data });
-                }
-                this._cache.get("TIMSetConfig")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMSetConfig");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: cb,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMSetConfig",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(param.json_config),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    param.user_data,
+                ],
             });
-            this._cache.set("TIMSetConfig", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMSetConfig(
-                json_config,
-                this._cache.get("TIMSetConfig")?.get(now)?.callback,
-                user_data
-            );
             code !== 0 && reject({ code });
         });
     }
@@ -447,43 +633,38 @@ class TimbaseManager {
     callExperimentalAPI(
         param: callExperimentalAPIParam
     ): Promise<commonResult<string>> {
-        const user_data = param.user_data
-            ? nodeStrigToCString(param.user_data)
-            : nodeStrigToCString("");
-        const json_param = nodeStrigToCString(JSON.stringify(param.json_param));
-        return new Promise(resolve => {
-            const now = `${Date.now()}${randomString()}`;
-
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                if (code === 0) {
-                    resolve({ code, desc, json_param, user_data });
-                } else {
-                    resolve({ code, desc, json_param, user_data });
-                }
-                this._cache.get("callExperimentalAPI")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("callExperimentalAPI");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: cb,
-                callback: callback,
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "callExperimentalAPI",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.I32,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(param.json_param),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    param.user_data,
+                ],
             });
-            this._cache.set("callExperimentalAPI", cacheMap);
-            const code = this._sdkconfig.Imsdklib.callExperimentalAPI(
-                json_param,
-                this._cache.get("callExperimentalAPI")?.get(now)?.callback,
-                user_data
-            );
-            code !== 0 && resolve({ code });
-            code === 0 && resolve({ code });
+            code !== 0 && reject({ code });
         });
     }
     /**
@@ -498,55 +679,52 @@ class TimbaseManager {
     TIMProfileGetUserProfileList(
         param: TIMProfileGetUserProfileListParam
     ): Promise<commonResult<Array<userProfile>>> {
-        const userData = param.user_data
-            ? nodeStrigToCString(param.user_data)
-            : nodeStrigToCString("");
-        const json_param = nodeStrigToCString(
-            JSON.stringify(param.json_get_user_profile_list_param)
-        );
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                let param: Array<userProfile>;
-                try {
-                    param = JSON.parse(
-                        json_param.trim().length > 0
-                            ? json_param.trim()
-                            : JSON.stringify([])
-                    );
-                } catch {
-                    param = [] as Array<userProfile>;
-                }
-                if (code === 0) {
-                    resolve({ code, desc, json_param: param, user_data });
-                } else {
-                    reject({ code, desc, json_param: param, user_data });
-                }
-                this._cache.get("TIMProfileGetUserProfileList")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMProfileGetUserProfileList");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: cb,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMProfileGetUserProfileList",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(param.json_get_user_profile_list_param),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<userProfile>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<userProfile>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    param.user_data,
+                ],
             });
-            this._cache.set("TIMProfileGetUserProfileList", cacheMap);
-            const code = this._sdkconfig.Imsdklib.TIMProfileGetUserProfileList(
-                json_param,
-                this._cache.get("TIMProfileGetUserProfileList")?.get(now)
-                    ?.callback,
-                userData
-            );
             code !== 0 && reject({ code });
         });
     }
@@ -559,48 +737,294 @@ class TimbaseManager {
     TIMProfileModifySelfUserProfile(
         param: TIMProfileModifySelfUserProfileParam
     ): Promise<commonResult<string>> {
-        const userData = param.user_data
-            ? nodeStrigToCString(param.user_data)
-            : nodeStrigToCString("");
-        const json_param = nodeStrigToCString(
-            JSON.stringify(param.json_modify_self_user_profile_param)
-        );
-
         return new Promise((resolve, reject) => {
-            const now = `${Date.now()}${randomString()}`;
-
-            const cb: CommonCallbackFun = (
-                code,
-                desc,
-                json_param,
-                user_data
-            ) => {
-                if (code === 0) {
-                    resolve({ code, desc, json_param, user_data });
-                } else {
-                    reject({ code, desc, json_param, user_data });
-                }
-                this._cache.get("TIMProfileModifySelfUserProfile")?.delete(now);
-            };
-            const callback = jsFuncToFFIFun(cb);
-            let cacheMap = this._cache.get("TIMProfileModifySelfUserProfile");
-            if (cacheMap === undefined) {
-                cacheMap = new Map();
-            }
-            cacheMap.set(now, {
-                cb: cb,
-                callback: callback,
+            const code = load({
+                library: libName,
+                funcName: "TIMProfileModifySelfUserProfile",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(param.json_modify_self_user_profile_param),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    param.user_data,
+                ],
             });
-            this._cache.set("TIMProfileModifySelfUserProfile", cacheMap);
-            const code =
-                this._sdkconfig.Imsdklib.TIMProfileModifySelfUserProfile(
-                    json_param,
-                    this._cache.get("TIMProfileModifySelfUserProfile")?.get(now)
-                        ?.callback,
-                    userData
-                );
             code !== 0 && reject({ code });
         });
+    }
+    /**
+     * @brief 查询用户状态
+     * @note 如果您想查询自己的自定义状态，您只需要传入自己的 userID 即可
+     */
+    TIMGetUserStatus(
+        param: userStatusParam
+    ): Promise<commonResult<Array<userStatus>>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMGetUserStatus",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(param.id_array),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: Array<userStatus>;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify([])
+                                );
+                            } catch {
+                                param = [] as Array<userStatus>;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    param.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+    /**
+     * @brief 设置自己的状态
+     * @note 请注意，该接口只支持设置自己的自定义状态
+     */
+    TIMSetSelfStatus(param: setSelfStatusParam): Promise<commonResult<string>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMSetSelfStatus",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(param.status),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    param.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+    /**
+     * @brief 订阅用户状态
+     * @note
+     * - 当成功订阅用户状态后，当对方的状态（包含在线状态、自定义状态）发生变更后，您可以监听 TIMSetUserStatusChangedCallback 回调来感知
+     * - 如果您需要订阅好友列表的状态，您只需要在控制台上打开开关即可，无需调用该接口
+     * - 该接口不支持订阅自己，您可以通过监听 TIMSetUserStatusChangedCallback 回调来感知自身的自定义状态的变更
+     * - 订阅列表有个数限制，超过限制后，会自动淘汰最先订阅的用户
+     */
+    TIMSubscribeUserStatus(
+        param: userStatusParam
+    ): Promise<commonResult<string>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMSubscribeUserStatus",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(param.id_array),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    param.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+    /**
+     * @brief 取消订阅用户状态
+     * @note 当 userIDList 为空或者 null 时，取消当前所有的订阅
+     */
+    TIMUnsubscribeUserStatus(
+        param: userStatusParam
+    ): Promise<commonResult<string>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMUnsubscribeUserStatus",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(param.id_array),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    param.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+
+    /**
+     *
+     * @param param
+     * @note 请注意：
+     * - 成功订阅用户资料后，当订阅用户资料发生变更，您可以通过监听 TIMSetUserInfoChangedCallback 回调来感知
+     * - 该接口不支持订阅自己，您可以通过监听 TIMSetSelfInfoUpdatedCallback 回调来感知自己资料的变更
+     * - 订阅列表最多允许订阅 200 个，超过限制后，会自动淘汰最先订阅的用户
+     * - 该接口支持订阅好友资料，但是不推荐这种使用方法，因为订阅好友资料后，好友资料的变更仍然会通过 TIMSetUpdateFriendProfileCallback 回调来通知，并且订阅好友也会占用 200 的订阅上限名额
+     */
+    TIMSubscribeUserInfo(
+        param: SubscribeUserInfoParam
+    ): Promise<commonResult<string>> {
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMSubscribeUserInfo",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(param.json_user_id_list),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({ code, desc, json_param, user_data });
+                        } else {
+                            reject({ code, desc, json_param, user_data });
+                        }
+                    },
+                    param.user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+
+    async TIMSetUserInfoChangedCallback(params: UserInfoChangedCallbackParam) {
+        const { callback } = params;
+        if (callback != null) {
+            load({
+                library: libName,
+                funcName: "TIMSetUserInfoChangedCallback",
+                retType: DataType.Void,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [DataType.String, DataType.String],
+                        permanent: true,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [callback, params.user_data ?? ""],
+            });
+        } else {
+            load({
+                library: libName,
+                funcName: "TIMSetUserInfoChangedCallback",
+                retType: DataType.Void,
+                paramsType: [DataType.Void, DataType.String],
+                paramsValue: [null, params.user_data ?? ""],
+            });
+        }
     }
 }
 export default TimbaseManager;

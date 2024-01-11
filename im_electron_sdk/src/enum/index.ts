@@ -627,7 +627,7 @@ export enum TIMGroupMemberRoleFlag {
  *  | kTIMGroupInfoFlag_Notification  | 群公告内容 | 0x01 << 10 |
  *  | kTIMGroupInfoFlag_Introduction  | 群简介内容 | 0x01 << 11|
  *  | kTIMGroupInfoFlag_FaceUrl  | 群头像URL | 0x01 << 12 |
- *  | kTIMGroupInfoFlag_AddOpton  | 加群选项 | 0x01 << 13 |
+ *  | kTIMGroupInfoFlag_AddOption  | 加群选项 | 0x01 << 13 |
  *  | kTIMGroupInfoFlag_GroupType  | 群类型 | 0x01 << 14 |
  *  | kTIMGroupInfoFlag_LastMsg  | 群组内最新一条消息 | 0x01 << 15 |
  *  | kTIMGroupInfoFlag_OnlineNum  | 群组在线成员数 | 0x01 << 16 |
@@ -650,7 +650,7 @@ export enum TIMGroupGetInfoFlag {
     kTIMGroupInfoFlag_Notification = 0x01 << 10, // 群公告内容
     kTIMGroupInfoFlag_Introduction = 0x01 << 11, // 群简介内容
     kTIMGroupInfoFlag_FaceUrl = 0x01 << 12, // 群头像URL
-    kTIMGroupInfoFlag_AddOpton = 0x01 << 13, // 加群选项
+    kTIMGroupInfoFlag_AddOption = 0x01 << 13, // 加群选项
     kTIMGroupInfoFlag_GroupType = 0x01 << 14, // 群类型
     kTIMGroupInfoFlag_LastMsg = 0x01 << 15, // 群组内最新一条消息
     kTIMGroupInfoFlag_OnlineNum = 0x01 << 16, // 群组在线成员数
@@ -792,14 +792,18 @@ export enum TIMImageLevel {
  *  | kTIMGroupTipChangeFlag_Attribute  | 群属性变更 (新增) | kTIMGroupTipChangeFlag_Attribute |
  */
 export enum TIMGroupTipGroupChangeFlag {
-    kTIMGroupTipChangeFlag_Unknown, // 未知的修改
-    kTIMGroupTipChangeFlag_Name, // 修改群组名称
-    kTIMGroupTipChangeFlag_Introduction, // 修改群简介
-    kTIMGroupTipChangeFlag_Notification, // 修改群公告
-    kTIMGroupTipChangeFlag_FaceUrl, // 修改群头像URL
-    kTIMGroupTipChangeFlag_Owner, // 修改群所有者
-    kTIMGroupTipChangeFlag_Custom, // 修改群自定义信息
-    kTIMGroupTipChangeFlag_Attribute, // 群属性变更 (新增)
+    kTIMGroupTipChangeFlag_Unknown = 0x0, // 未知的修改
+    kTIMGroupTipChangeFlag_Name = 0x1, // 修改群组名称
+    kTIMGroupTipChangeFlag_Introduction = 0x2, // 修改群简介
+    kTIMGroupTipChangeFlag_Notification = 0x3, // 修改群公告
+    kTIMGroupTipChangeFlag_FaceUrl = 0x4, // 修改群头像URL
+    kTIMGroupTipChangeFlag_Owner = 0x5, // 修改群所有者
+    kTIMGroupTipChangeFlag_Custom = 0x6, // 修改群自定义信息
+    kTIMGroupTipChangeFlag_Attribute = 0x7, // 群属性变更 (新增)
+    kTIMGroupTipChangeFlag_ShutupAll = 0x08, // 全员禁言字段变更
+    kTIMGroupTipChangeFlag_MessageReceiveOpt = 0x0a, // 消息接收选项变更
+    kTIMGroupTipChangeFlag_GroupAddOpt = 0x0b, // 申请加群方式下管理员审批选项变更
+    kTIMGroupTipChangeFlag_GroupApproveOpt = 0x0c, // 邀请进群方式下管理员审批选项变更
 }
 
 /**
@@ -1069,11 +1073,13 @@ export enum TIMGroupModifyInfoFlag {
     kTIMGroupModifyInfoFlag_Introduction = 0x01 << 2, // 修改群简介
     kTIMGroupModifyInfoFlag_FaceUrl = 0x01 << 3, // 修改群头像URL
     kTIMGroupModifyInfoFlag_AddOption = 0x01 << 4, // 修改群组添加选项
-    kTIMGroupModifyInfoFlag_MaxMmeberNum = 0x01 << 5, // 修改群最大成员数
+    kTIMGroupModifyInfoFlag_MaxMemberNum = 0x01 << 5, // 修改群最大成员数
     kTIMGroupModifyInfoFlag_Visible = 0x01 << 6, // 修改群是否可见
     kTIMGroupModifyInfoFlag_Searchable = 0x01 << 7, // 修改群是否被搜索
     kTIMGroupModifyInfoFlag_ShutupAll = 0x01 << 8, // 修改群是否全体禁言
     kTIMGroupModifyInfoFlag_Custom = 0x01 << 9, // 修改群自定义信息
+    kTIMGroupTopicModifyInfoFlag_CustomString = 0x01 << 11, // 话题自定义字段
+    kTIMGroupModifyInfoFlag_ApproveOption = 0x01 << 12, // 邀请进群管理员审批选项
     kTIMGroupModifyInfoFlag_Owner = 0x01 << 31, // 修改群主
 }
 
@@ -1168,7 +1174,7 @@ export enum TIMGroupSearchFieldKey {
  */
 export enum TIMGroupMemberSearchFieldKey {
     kTIMGroupMemberSearchFieldKey_Identifier = 0x01, // 用户 ID
-    kTIMGroupMemberSearchFieldKey_NikeName = 0x01 << 1, // 昵称
+    kTIMGroupMemberSearchFieldKey_NickName = 0x01 << 1, // 昵称
     kTIMGroupMemberSearchFieldKey_Remark = 0x01 << 2, // 备注
     kTIMGroupMemberSearchFieldKey_NameCard = 0x01 << 3, // 名片
 }
@@ -1183,7 +1189,7 @@ export enum TIMGroupMemberSearchFieldKey {
  *  | kTIMGenderType_Female  | 性别女 |   kTIMGenderType_Female |
  */
 export enum TIMGenderType {
-    kTIMGenderType_Unkown, // 未知性别
+    kTIMGenderType_Unknown, // 未知性别
     kTIMGenderType_Male, // 性别男
     kTIMGenderType_Female, // 性别女
 }
@@ -1214,7 +1220,7 @@ export enum TIMProfileAddPermission {
  *  | FriendTypeBoth  | 双向好友：用户A的好友表中有用户B，B的好友表中也有A |  FriendTypeBoth |
  */
 export enum TIMFriendType {
-    FriendTypeSignle, // 单向好友：用户A的好友表中有用户B，但B的好友表中却没有A
+    FriendTypeSingle, // 单向好友：用户A的好友表中有用户B，但B的好友表中却没有A
     FriendTypeBoth, // 双向好友：用户A的好友表中有用户B，B的好友表中也有A
 }
 
@@ -1276,7 +1282,7 @@ export enum TIMFriendCheckRelation {
  */
 export enum TIMFriendshipSearchFieldKey {
     kTIMFriendshipSearchFieldKey_Identifier = 0x01, // userid
-    kTIMFriendshipSearchFieldKey_NikeName = 0x01 << 1, // 昵称
+    kTIMFriendshipSearchFieldKey_NickName = 0x01 << 1, // 昵称
     kTIMFriendshipSearchFieldKey_Remark = 0x01 << 2, // 备注
 }
 
@@ -1310,6 +1316,18 @@ export enum TIMInternalOperation {
     kTIMInternalOperationInitLocalStorage = "internal_operation_init_local_storage",
     kTIMInternalOperationSetUIPlatform = "internal_operation_set_ui_platform",
     kTIMInternalOperationSetCosSaveRegionForConversation = "internal_operation_set_cos_save_region_for_conversation",
+    kTIMInternalOperationSetIPv6Prior = "internal_operation_set_ipv6_prior",
+    kTIMInternalOperationSetPacketRequestTimeout = "internal_operation_set_packet_request_timeout",
+    kTIMInternalOperationSetCustomServerInfo = "internal_operation_set_custom_server_info",
+    kTIMInternalOperationSetQuicChannelInfo = "internal_operation_set_quic_channel_info",
+    kTIMInternalOperationSetSM4GCMCallback = "internal_operation_set_sm4_gcm_callback",
+    kTIMInternalOperationSetDatabaseEncryptInfo = "internal_operation_set_database_encrypt_info",
+    kTIMInternalOperationIsCommercialAbilityEnabled = "internal_operation_is_commercial_ability_enabled",
+    kTIMInternalOperationSetOfflinePushState = "internal_operation_set_offline_push_state",
+    kTIMInternalOperationGetOfflinePushState = "internal_operation_get_offline_push_state",
+    kTIMInternalOperationGetMessageRevoker = "internal_operation_get_message_revoker",
+    kTIMInternalOperationWriteLog = "internal_operation_write_log",
+    kTIMInternalOperationClearLocalHistoryMessage = "internal_operation_clear_local_history_message",
 }
 /**
  * @brief ios 离线推送的类型
@@ -1326,4 +1344,29 @@ export enum TIMOfflinePushTokenType {
     TIMOfflinePushTokenType_Default = 0, // 默认厂商 token, 例如 APNS/小米 push/Huawei push 等
     TIMOfflinePushTokenType_TPNS = 1, // TPNS
     TIMOfflinePushTokenType_VOIP = 2, // VoIP push
+}
+
+/**
+ * @brief 用户状态类型
+ */
+export enum TIMUserStatusType {
+    kTIMUserStatusType_Unkown = 0, // 未知状态
+    kTIMUserStatusType_Online = 1, // 在线状态
+    kTIMUserStatusType_Offline = 2, // 离线状态
+    kTIMUserStatusType_UnLogined = 3, // 未登录（如主动调用 TIMLogout 接口，或者账号注册后还未登录）
+}
+
+export enum TIMSignalingActionType {
+    // 未定义
+    TIMSignalingActionType_Unknown,
+    // 邀请方发起邀请
+    TIMSignalingActionType_Invite,
+    // 邀请方取消邀请
+    TIMSignalingActionType_CancelInvite,
+    // 被邀请方接受邀请
+    TIMSignalingActionType_AcceptInvite,
+    // 被邀请方拒绝邀请
+    TIMSignalingActionType_RejectInvite,
+    // 邀请超时
+    TIMSignalingActionType_InviteTimeout,
 }

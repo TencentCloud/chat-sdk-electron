@@ -1,11 +1,8 @@
 import { TIMIPCLISTENR } from "./const/const";
-import { v4 as uuidv4 } from "uuid";
 import {
     loginParam,
     CreateGroupParams,
-    commonResponse,
     logoutParam,
-    getLoginUserIDParam,
     GroupAttributeCallbackParams,
     InitGroupAttributeParams,
     DeleteAttributeParams,
@@ -90,18 +87,12 @@ import {
     convTotalUnreadMessageCountChangedCallbackParam,
     getConvList,
     setConvEventCallback,
-    ActionType,
     customDataTpl,
-    handleParam,
-    signalCallback,
-    TRTCCallingCallGroupParam,
-    TRTCCallingCallParam,
     initParam,
     MsgSendReplyMessage,
     MsgSendGroupMessageReceiptsParam,
     MsgGetGroupMessageReceiptsParam,
     MsgGetGroupMessageReadMembersParam,
-    MsgGroupMessageReceiptCallbackParam,
     TIMMsgReadedReceiptCallbackFunc,
     TIMMsgElemUploadProgressCallbackFunc,
     GroupTipCallBackFun,
@@ -124,7 +115,6 @@ import {
     commonResult,
     totalUnreadCountResult,
     userProfile,
-    GroupParams,
     DeleteMemberResult,
     GroupInfo,
     GroupInfoResult,
@@ -144,7 +134,6 @@ import {
     convInfo,
     Json_value_msg,
     C2CRecvMsgOptResult,
-    DownloadElemResult,
     BatchSendResult,
     MessageSearchResult,
     TIMSetMsgExtensionsChangedCallbackParam,
@@ -166,24 +155,67 @@ import {
     renameConvGroupParam,
     setConvCustomDataParam,
     OfflinePushToken,
+    TIMRecvNewMsgCallbackFunc,
+    GroupCounterParams,
+    GroupCounter,
+    IncreaseGroupCounterParam,
+    DeleteConvListParam,
+    CleanUnreadMessageCoutParam,
+    GetGroupCounterParams,
+    convUnreadMessageCountChangedByFilterCallbackParam,
+    convTotalUnreadMessageCountChangedByFilterCallback,
+    TIMSetSelfInfoUpdatedCallbackParam,
+    TIMSetUserStatusChangedCallbackParam,
+    TIMSelfInfoUpdatedCallback,
+    TIMUserStatusChangedCallback,
+    TIMMsgDownloadElemToPathFunc,
+    userStatusParam,
+    userStatus,
+    setSelfStatusParam,
+    convGroupCreatedCallbackParam,
+    convGroupDeletedCallbackParam,
+    convGroupNameChangedCallback,
+    TIMConvConversationGroupCreatedCallback,
+    TIMConvConversationGroupDeletedCallback,
+    TIMConvConversationGroupNameChangedCallback,
+    GetCommunityListParam,
+    GroupBaseInfo,
+    CreateTopicParam,
+    DeleteTopicParam,
+    TopicOperationResult,
+    SetTopicInfoParam,
+    GroupTopicInfoResult,
+    GroupCounterChangedParam,
+    TopicCreatedParam,
+    TopicDeletedParam,
+    TopicChangedParam,
+    TIMGroupCounterChangedCallback,
+    TIMGroupTopicCreatedCallback,
+    TIMGroupTopicDeletedCallback,
+    TIMGroupTopicChangedCallback,
+    UserInfoChangedCallbackParam,
+    SubscribeUserInfoParam,
+    TIMUserInfoChangedCallback,
+    inviteParam,
+    inviteInGroupParam,
+    signalingParam,
+    getSignalingInfoParam,
+    SignalingInfo,
+    SetSignalingReceiveNewInvitationCallbackParam,
+    SetSignalingInviteeAcceptedCallbackParam,
+    SetSignalingInviteeRejectedCallbackParam,
+    SetSignalingInvitationCancelledCallbackParam,
+    SetSignalingInvitationTimeoutCallParam,
+    SetSignalingInvitationModifiedCallback,
+    TranslateTextParam,
+    ConvertVoiceToTextParam,
+    MessageTranslateTextResult,
 } from "./interface";
 import { ipcData, Managers } from "./interface/ipcInterface";
 import { ipcRenderer } from "electron";
-import { TIMConvType, TIMLoginStatus } from "./enum";
+import { TIMLoginStatus } from "./enum";
 // import log from "./utils/log";
 import { getCurrentWindow } from "@electron/remote";
-import { jsFunToFFITIMSetConvTotalUnreadMessageCountChangedCallback } from "./utils/utils";
-const log = {
-    info: function (...args: any) {},
-    error: function (...args: any) {},
-};
-const deepClone = (obj: object) => {
-    if (!obj) {
-        return false;
-    }
-    // 先简单实现
-    return JSON.parse(JSON.stringify(obj));
-};
 
 interface JoinGroupParams {
     groupId: string;
@@ -200,14 +232,15 @@ export default class TimRender {
     static runtime: Map<string, Function> = new Map();
     static isListened = false;
     private _currentWindowID = getCurrentWindow().id;
-
+    static _recvNewMsgCallbackArray: Array<TIMRecvNewMsgCallbackFunc> =
+        new Array();
+    static _downloadCallbackArray: Array<TIMMsgDownloadElemToPathFunc> =
+        new Array();
     constructor() {
         if (!TimRender.isListened) {
             ipcRenderer.on(`global-callback-reply`, (e: any, res: any) => {
                 try {
-                    console.log(res, "timrender");
                     const { callbackKey, responseData } = JSON.parse(res);
-                    console.log(JSON.parse(res));
                     // log.info("事件回调返回渲染进程", JSON.parse(res));
                     if (this._getCallback(callbackKey)) {
                         //@ts-ignore
@@ -215,10 +248,10 @@ export default class TimRender {
 
                         // 处理信令的逻辑
 
-                        if (callbackKey === "TIMAddRecvNewMsgCallback") {
-                            //收到消息
-                            this._handleMessage(responseData[0]);
-                        }
+                        // if (callbackKey === "TIMAddRecvNewMsgCallback") {
+                        //     //收到消息
+                        //     this._handleMessage(responseData[0]);
+                        // }
                     }
                 } catch (err) {
                     console.error("全局回调异常", err);
@@ -232,7 +265,6 @@ export default class TimRender {
         if (message) {
             try {
                 const messageItems = JSON.parse(message);
-                console.log("收到消息", messageItems);
 
                 for (let j = 0; j < messageItems.length; j++) {
                     const { message_elem_array } = messageItems[j];
@@ -247,60 +279,19 @@ export default class TimRender {
                                 if (parasedData) {
                                     const { inviteID, actionType } =
                                         parasedData;
-                                    if (inviteID) {
-                                        // 是信令消息
-                                        switch (actionType) {
-                                            case ActionType.INVITE:
-                                                this._onInvited(
-                                                    inviteID,
-                                                    parasedData,
-                                                    message
-                                                );
-                                                break;
-                                            case ActionType.ACCEPT_INVITE:
-                                                this._onAccepted(
-                                                    inviteID,
-                                                    parasedData,
-                                                    message
-                                                );
-                                                break;
-                                            case ActionType.CANCEL_INVITE:
-                                                this._onCanceled(
-                                                    inviteID,
-                                                    parasedData,
-                                                    message
-                                                );
-                                                break;
-                                            case ActionType.INVITE_TIMEOUT:
-                                                this._onTimeouted(
-                                                    inviteID,
-                                                    parasedData,
-                                                    message
-                                                );
-                                                break;
-                                            case ActionType.REJECT_INVITE:
-                                                this._onRejected(
-                                                    inviteID,
-                                                    parasedData,
-                                                    message
-                                                );
-                                                break;
-                                        }
-                                    }
                                 }
                             } catch (err) {
-                                log.error(
-                                    "IM_ELECTRON_SDK:尝试解析信令失败，业务可不关注"
-                                );
                                 console.log(
                                     "IM_ELECTRON_SDK:尝试解析信令失败，业务可不关注"
                                 );
+                                // console.log(
+                                //     "IM_ELECTRON_SDK:尝试解析信令失败，业务可不关注"
+                                // );
                             }
                         }
                     }
                 }
             } catch (err) {
-                log.error("解析消息失败：", err);
                 console.error("解析消息失败：", err);
             }
         }
@@ -363,242 +354,23 @@ export default class TimRender {
         return displayContent;
     }
 
-    private async _onInvited(inviteID: string, parsedData: any, message: any) {
-        try {
-            //@ts-ignore
-            const { data: serverTime } = await this.TIMGetServerTime();
-            const msg = JSON.parse(message)[0];
-            const { message_server_time } = msg;
-            const { timeout } = parsedData;
-
-            if (timeout > 0 && serverTime - message_server_time > timeout) {
-                console.log(
-                    `signaling receive invitation but ignore to callback because timeInterval:${
-                        serverTime - message_server_time
-                    } > timeout: ${timeout}`
-                );
-                return null;
-            }
-            //@ts-ignore
-            const userID = (await this.TIMGetLoginUserID({})).json_param;
-            const { inviteeList } = parsedData;
-            if (
-                inviteeList &&
-                inviteeList.length &&
-                inviteeList.includes(userID)
-            ) {
-                if (this._getCallback("TIMOnInvited")) {
-                    await this._setCallInfo(inviteID, deepClone(parsedData));
-                    //@ts-ignore
-                    this._getCallback("TIMOnInvited")(message);
-                    // 开始倒计时计算超时
-                    if (timeout > 0) {
-                        const { inviteID } = parsedData;
-                        this._setCallingTimeout(inviteID, true, msg);
-                    }
-                }
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    }
-    private async _onRejected(inviteID: string, parsedData: any, message: any) {
-        const callInfo = deepClone(await this._getCallInfo(inviteID));
-        if (callInfo) {
-            //@ts-ignore
-            const { inviteeList: rejectList } = parsedData;
-
-            if (rejectList && rejectList.length) {
-                const accepter = rejectList[0];
-                if (this._getCallback("TIMOnRejected")) {
-                    // 收到拒绝，要把人从inviteList里去掉
-                    const { inviteeList } = callInfo;
-                    const newInviteeList =
-                        inviteeList?.filter(
-                            (item: string) => item !== accepter
-                        ) || [];
-
-                    log.info(
-                        `acceptList ${rejectList},newInviteeList :${newInviteeList}`
-                    );
-                    if (newInviteeList.length > 0) {
-                        callInfo.inviteeList = newInviteeList;
-                        await this._setCallInfo(inviteID, callInfo);
-                    } else {
-                        await this._deleteCallInfo(inviteID);
-                    }
-                    //@ts-ignore
-                    this._getCallback("TIMOnRejected")(message);
-                }
-            }
-        }
-    }
-    private async _onAccepted(inviteID: string, parsedData: any, message: any) {
-        const callInfo = deepClone(await this._getCallInfo(inviteID));
-        if (callInfo) {
-            //@ts-ignore
-            const { inviteeList: acceptList } = parsedData;
-
-            if (acceptList && acceptList.length) {
-                const accepter = acceptList[0];
-
-                if (this._getCallback("TIMOnAccepted")) {
-                    // 收到拒绝，要把人从inviteList里去掉
-                    const { inviteeList } = callInfo;
-                    const newInviteeList =
-                        inviteeList?.filter(
-                            (item: string) => item !== accepter
-                        ) || [];
-                    log.info(
-                        `acceptList ${acceptList},newInviteeList :${newInviteeList}`
-                    );
-                    if (newInviteeList?.length > 0) {
-                        callInfo.inviteeList = newInviteeList;
-                        await this._setCallInfo(inviteID, callInfo);
-                    } else {
-                        await this._deleteCallInfo(inviteID);
-                    }
-                    //@ts-ignore
-                    this._getCallback("TIMOnAccepted")(message);
-                }
-            }
-        }
-    }
-    private async _onCanceled(inviteID: string, parsedData: any, message: any) {
-        const callInfo = deepClone(await this._getCallInfo(inviteID));
-        if (callInfo) {
-            if (this._getCallback("TIMOnCanceled")) {
-                await this._deleteCallInfo(inviteID);
-                //@ts-ignore
-                this._getCallback("TIMOnCanceled")(message);
-            }
-        }
-    }
-    private async _onTimeouted(
-        inviteID: string,
-        parsedData: any,
-        message: any
-    ) {
-        //@ts-ignore
-        const { inviteeList: timeouter } = parsedData;
-        const handler = timeouter[0];
-        if (timeouter && timeouter.length) {
-            if (this._getCallback("TIMOnTimeout")) {
-                const callInfo = deepClone(await this._getCallInfo(inviteID));
-                const { inviteeList } = callInfo;
-                const newInviteeList =
-                    inviteeList?.filter((item: any) => item !== handler) || [];
-                if (newInviteeList.length > 0) {
-                    parsedData.inviteeList = newInviteeList;
-                    await this._setCallInfo(inviteID, parsedData);
-                } else {
-                    await this._deleteCallInfo(inviteID);
-                }
-                //@ts-ignore
-
-                this._getCallback("TIMOnTimeout")(message);
-            }
-        }
-    }
     private _setCallback(key: string, callback: Function) {
         TimRender.runtime.set(`${key}_${this._currentWindowID}`, callback);
     }
     private _getCallback(key: string) {
         return TimRender.runtime.get(`${key}_${this._currentWindowID}`);
     }
-    /**
-     * Example
-     *
-     * ```typescript
-     * import TimRender from "im_electron_sdk/dist/renderer";
-     * // 初始化TimeRender 示例
-     * const timRenderInstance = new TimRender();
-     *
-     * const callback = (data) => console.log(data);
-     * timRenderInstance.TIMOnInvited(callback)
-     * ```
-     */
-    TIMOnInvited(param: signalCallback) {
-        return new Promise(resolve => {
-            this._setCallback("TIMOnInvited", param.callback);
-            resolve({});
-        });
-    }
-    /**
-     * Example
-     *
-     * ```typescript
-     * import TimRender from "im_electron_sdk/dist/renderer";
-     * // 初始化TimeRender 示例
-     * const timRenderInstance = new TimRender();
-     *
-     * const callback = (data) => console.log(data);
-     * timRenderInstance.TIMOnRejected(callback)
-     * ```
-     */
-    TIMOnRejected(param: signalCallback) {
-        return new Promise(resolve => {
-            this._setCallback("TIMOnRejected", param.callback);
-            resolve({});
-        });
-    }
-    /**
-     * Example
-     *
-     * ```typescript
-     * import TimRender from "im_electron_sdk/dist/renderer";
-     * // 初始化TimeRender 示例
-     * const timRenderInstance = new TimRender();
-     *
-     * const callback = (data) => console.log(data);
-     * timRenderInstance.TIMOnAccepted(callback)
-     * ```
-     */
-    TIMOnAccepted(param: signalCallback) {
-        return new Promise(resolve => {
-            this._setCallback("TIMOnAccepted", param.callback);
-            resolve({});
-        });
-    }
-    /**
-     * Example
-     *
-     * ```typescript
-     * import TimRender from "im_electron_sdk/dist/renderer";
-     * // 初始化TimeRender 示例
-     * const timRenderInstance = new TimRender();
-     *
-     * const callback = (data) => console.log(data);
-     * timRenderInstance.TIMOnCanceled(callback)
-     * ```
-     */
-    TIMOnCanceled(param: signalCallback) {
-        return new Promise(resolve => {
-            this._setCallback("TIMOnCanceled", param.callback);
-            resolve({});
-        });
-    }
-    /**
-     * Example
-     *
-     * ```typescript
-     * import TimRender from "im_electron_sdk/dist/renderer";
-     * // 初始化TimeRender 示例
-     * const timRenderInstance = new TimRender();
-     *
-     * const callback = (data) => console.log(data);
-     * timRenderInstance.TIMOnTimeout(callback)
-     * ```
-     */
-    TIMOnTimeout(param: signalCallback) {
-        return new Promise(resolve => {
-            this._setCallback("TIMOnTimeout", param.callback);
-            resolve({});
-        });
-    }
     TIMConvGetTotalUnreadMessageCount(param: convGetTotalUnreadMessageCount) {
         const formatedData = {
             method: "TIMConvGetTotalUnreadMessageCount",
+            manager: Managers.conversationManager,
+            param: param,
+        };
+        return this._call<commonResult<totalUnreadCountResult>>(formatedData);
+    }
+    TIMConvGetUnreadMessageCountByFilter(param: TIMConversationListFilter) {
+        const formatedData = {
+            method: "TIMConvGetUnreadMessageCountByFilter",
             manager: Managers.conversationManager,
             param: param,
         };
@@ -651,6 +423,48 @@ export default class TimRender {
             param: param,
         };
         return this._call<commonResult<string>>(formatedData);
+    }
+    TIMConvDeleteConversationList(param: DeleteConvListParam) {
+        const formatedData = {
+            method: "TIMConvDeleteConversationList",
+            manager: Managers.conversationManager,
+            param: param,
+        };
+        return this._call<commonResult<Array<TIMConversationOperationResult>>>(
+            formatedData
+        );
+    }
+    TIMConvSubscribeUnreadMessageCountByFilter(
+        param: TIMConversationListFilter
+    ) {
+        const formatedData = {
+            method: "TIMConvSubscribeUnreadMessageCountByFilter",
+            manager: Managers.conversationManager,
+            param: param,
+        };
+        return this._call<number>(formatedData);
+    }
+    TIMConvUnsubscribeUnreadMessageCountByFilter(
+        param: TIMConversationListFilter
+    ) {
+        const formatedData = {
+            method: "TIMConvUnsubscribeUnreadMessageCountByFilter",
+            manager: Managers.conversationManager,
+            param: param,
+        };
+        return this._call<number>(formatedData);
+    }
+    TIMConvCleanConversationUnreadMessageCount(
+        param: CleanUnreadMessageCoutParam
+    ) {
+        const formatedData = {
+            method: "TIMConvCleanConversationUnreadMessageCount",
+            manager: Managers.conversationManager,
+            param: param,
+        };
+        return this._call<commonResult<Array<TIMConversationOperationResult>>>(
+            formatedData
+        );
     }
     TIMConvCreate(param: convCreate) {
         const formatedData = {
@@ -760,6 +574,22 @@ export default class TimRender {
         };
         return this._call<void>(formatedData);
     }
+    TIMSetConvUnreadMessageCountChangedByFilterCallback(
+        param: convUnreadMessageCountChangedByFilterCallbackParam
+    ) {
+        const callback = "TIMSetConvUnreadMessageCountChangedByFilterCallback";
+        this._setCallInfo(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMSetConvUnreadMessageCountChangedByFilterCallback",
+            manager: Managers.conversationManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<void>(formatedData);
+    }
     TIMSetConvEventCallback(param: setConvEventCallback) {
         const callback = `TIMSetConvEventCallback`;
         this._setCallback(callback, param.callback);
@@ -767,6 +597,86 @@ export default class TimRender {
         param.callback = callback;
         const formatedData = {
             method: "TIMSetConvEventCallback",
+            manager: Managers.conversationManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+    TIMSetConvConversationGroupCreatedCallback(
+        param: convGroupCreatedCallbackParam
+    ) {
+        const callback = `TIMSetConvConversationGroupCreatedCallback`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMSetConvConversationGroupCreatedCallback",
+            manager: Managers.conversationManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+    TIMSetConvConversationGroupDeletedCallback(
+        param: convGroupDeletedCallbackParam
+    ) {
+        const callback = `TIMSetConvConversationGroupDeletedCallback`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMSetConvConversationGroupDeletedCallback",
+            manager: Managers.conversationManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+    TIMSetConvConversationGroupNameChangedCallback(
+        param: convGroupNameChangedCallback
+    ) {
+        const callback = `TIMSetConvConversationGroupNameChangedCallback`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMSetConvConversationGroupNameChangedCallback",
+            manager: Managers.conversationManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+    TIMSetConvConversationsAddedToGroupCallback(
+        param: convGroupCreatedCallbackParam
+    ) {
+        const callback = `TIMSetConvConversationsAddedToGroupCallback`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMSetConvConversationsAddedToGroupCallback",
+            manager: Managers.conversationManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+    TIMSetConvConversationsDeletedFromGroupCallback(
+        param: convGroupCreatedCallbackParam
+    ) {
+        const callback = `TIMSetConvConversationsDeletedFromGroupCallback`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMSetConvConversationsDeletedFromGroupCallback",
             manager: Managers.conversationManager,
             callback,
             windowID: this._currentWindowID,
@@ -818,6 +728,58 @@ export default class TimRender {
         };
         return this._call<any>(formatedData);
     }
+    TIMSetSelfInfoUpdatedCallback(param: TIMSetSelfInfoUpdatedCallbackParam) {
+        const callback = `TIMSetSelfInfoUpdatedCallback`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMSetSelfInfoUpdatedCallback",
+            manager: Managers.timBaseManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+    TIMSubscribeUserInfo(param: SubscribeUserInfoParam) {
+        const formatedData = {
+            method: "TIMSubscribeUserInfo",
+            manager: Managers.conversationManager,
+            param: param,
+        };
+        return this._call<commonResult<string>>(formatedData);
+    }
+    TIMSetUserInfoChangedCallback(param: UserInfoChangedCallbackParam) {
+        const callback = `TIMSetUserInfoChangedCallback`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMSetUserInfoChangedCallback",
+            manager: Managers.timBaseManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+    TIMSetUserStatusChangedCallback(
+        param: TIMSetUserStatusChangedCallbackParam
+    ) {
+        const callback = `TIMSetUserStatusChangedCallback`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMSetUserStatusChangedCallback",
+            manager: Managers.timBaseManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
     TIMSetLogCallback(param: TIMSetLogCallbackParam) {
         const callback = `TIMSetLogCallback`;
         this._setCallback(callback, param.callback);
@@ -862,6 +824,7 @@ export default class TimRender {
         return this._call<number>(formatedData);
     }
     async TIMLogout(param: logoutParam) {
+        TimRender._recvNewMsgCallbackArray = [];
         await this.TIMRemoveRecvNewMsgCallback();
         await this.TIMSetMsgReadedReceiptCallback({
             callback: null as unknown as TIMMsgReadedReceiptCallbackFunc,
@@ -881,6 +844,18 @@ export default class TimRender {
         await this.TIMSetGroupAttributeChangedCallback({
             callback: null as unknown as GroupAttributeCallbackFun,
         });
+        await this.TIMSetGroupCounterChangedCallback({
+            callback: null as unknown as TIMGroupCounterChangedCallback,
+        });
+        await this.TIMSetGroupTopicCreatedCallback({
+            callback: null as unknown as TIMGroupTopicCreatedCallback,
+        });
+        await this.TIMSetGroupTopicDeletedCallback({
+            callback: null as unknown as TIMGroupTopicDeletedCallback,
+        });
+        await this.TIMSetGroupTopicChangedCallback({
+            callback: null as unknown as TIMGroupTopicChangedCallback,
+        });
         await this.TIMSetConvEventCallback({
             callback: null as unknown as convEventCallback,
         });
@@ -888,9 +863,51 @@ export default class TimRender {
             callback:
                 null as unknown as convTotalUnreadMessageCountChangedCallback,
         });
+        await this.TIMSetConvUnreadMessageCountChangedByFilterCallback({
+            callback:
+                null as unknown as convTotalUnreadMessageCountChangedByFilterCallback,
+        });
         await this.TIMSetNetworkStatusListenerCallback({
             callback: null as unknown as TIMSetNetworkStatusListenerCallback,
             userData: "",
+        });
+        await this.TIMSetSelfInfoUpdatedCallback({
+            callback: null as unknown as TIMSelfInfoUpdatedCallback,
+            user_data: "",
+        });
+        await this.TIMSetUserInfoChangedCallback({
+            callback: null as unknown as TIMUserInfoChangedCallback,
+            user_data: "",
+        });
+
+        await this.TIMSetUserStatusChangedCallback({
+            callback: null as unknown as TIMUserStatusChangedCallback,
+            user_data: "",
+        });
+        await this.TIMSetConvConversationGroupCreatedCallback({
+            callback:
+                null as unknown as TIMConvConversationGroupCreatedCallback,
+            user_data: "",
+        });
+        await this.TIMSetConvConversationGroupDeletedCallback({
+            callback:
+                null as unknown as TIMConvConversationGroupDeletedCallback,
+            user_data: "",
+        });
+        await this.TIMSetConvConversationGroupNameChangedCallback({
+            callback:
+                null as unknown as TIMConvConversationGroupNameChangedCallback,
+            user_data: "",
+        });
+        await this.TIMSetConvConversationsAddedToGroupCallback({
+            callback:
+                null as unknown as TIMConvConversationGroupCreatedCallback,
+            user_data: "",
+        });
+        await this.TIMSetConvConversationsDeletedFromGroupCallback({
+            callback:
+                null as unknown as TIMConvConversationGroupCreatedCallback,
+            user_data: "",
         });
         await this.TIMSetKickedOfflineCallback({
             callback: null as unknown as TIMSetKickedOfflineCallback,
@@ -993,6 +1010,38 @@ export default class TimRender {
         };
         return this._call<commonResult<string>>(formatedData);
     }
+    TIMGetUserStatus(param: userStatusParam) {
+        const formatedData = {
+            method: "TIMGetUserStatus",
+            manager: Managers.timBaseManager,
+            param: param,
+        };
+        return this._call<commonResult<Array<userStatus>>>(formatedData);
+    }
+    TIMSetSelfStatus(param: setSelfStatusParam) {
+        const formatedData = {
+            method: "TIMSetSelfStatus",
+            manager: Managers.timBaseManager,
+            param: param,
+        };
+        return this._call<commonResult<string>>(formatedData);
+    }
+    TIMSubscribeUserStatus(param: userStatusParam) {
+        const formatedData = {
+            method: "TIMSubscribeUserStatus",
+            manager: Managers.timBaseManager,
+            param: param,
+        };
+        return this._call<commonResult<string>>(formatedData);
+    }
+    TIMUnsubscribeUserStatus(param: userStatusParam) {
+        const formatedData = {
+            method: "TIMUnsubscribeUserStatus",
+            manager: Managers.timBaseManager,
+            param: param,
+        };
+        return this._call<commonResult<string>>(formatedData);
+    }
     /**
      * @param data  Comment for parameter ´text´.
      */
@@ -1046,10 +1095,111 @@ export default class TimRender {
         return this._call<commonResult<Array<GroupAttributes>>>(formatedData);
     }
 
+    TIMGroupGetJoinedCommunityList(data: GetCommunityListParam) {
+        const formatedData = {
+            method: "TIMGroupGetJoinedCommunityList",
+            manager: Managers.groupManager,
+            param: data,
+        };
+        return this._call<commonResult<Array<GroupBaseInfo>>>(formatedData);
+    }
+
+    TIMGroupCreateTopicInCommunity(data: CreateTopicParam) {
+        const formatedData = {
+            method: "TIMGroupCreateTopicInCommunity",
+            manager: Managers.groupManager,
+            param: data,
+        };
+        return this._call<commonResult<string>>(formatedData);
+    }
+
+    TIMGroupDeleteTopicFromCommunity(data: DeleteTopicParam) {
+        const formatedData = {
+            method: "TIMGroupDeleteTopicFromCommunity",
+            manager: Managers.groupManager,
+            param: data,
+        };
+        return this._call<commonResult<Array<TopicOperationResult>>>(
+            formatedData
+        );
+    }
+
+    TIMGroupSetTopicInfo(data: SetTopicInfoParam) {
+        const formatedData = {
+            method: "TIMGroupSetTopicInfo",
+            manager: Managers.groupManager,
+            param: data,
+        };
+        return this._call<commonResult<string>>(formatedData);
+    }
+
+    TIMGroupGetTopicInfoList(data: DeleteTopicParam) {
+        const formatedData = {
+            method: "TIMGroupGetTopicInfoList",
+            manager: Managers.groupManager,
+            param: data,
+        };
+        return this._call<commonResult<Array<GroupTopicInfoResult>>>(
+            formatedData
+        );
+    }
+
     TIMSetGroupAttributeChangedCallback(data: GroupAttributeCallbackParams) {
         const callback = "TIMSetGroupAttributeChangedCallback";
         const formatedData = {
             method: "TIMSetGroupAttributeChangedCallback",
+            manager: Managers.groupManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: data,
+        };
+
+        this._setCallback(callback, data.callback as unknown as Function);
+        return this._call<void>(formatedData);
+    }
+    TIMSetGroupCounterChangedCallback(data: GroupCounterChangedParam) {
+        const callback = "TIMSetGroupCounterChangedCallback";
+        const formatedData = {
+            method: "TIMSetGroupCounterChangedCallback",
+            manager: Managers.groupManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: data,
+        };
+
+        this._setCallback(callback, data.callback as unknown as Function);
+        return this._call<void>(formatedData);
+    }
+    TIMSetGroupTopicCreatedCallback(data: TopicCreatedParam) {
+        const callback = "TIMSetGroupTopicCreatedCallback";
+        const formatedData = {
+            method: "TIMSetGroupTopicCreatedCallback",
+            manager: Managers.groupManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: data,
+        };
+
+        this._setCallback(callback, data.callback as unknown as Function);
+        return this._call<void>(formatedData);
+    }
+    TIMSetGroupTopicDeletedCallback(data: TopicDeletedParam) {
+        const callback = "TIMSetGroupTopicDeletedCallback";
+        const formatedData = {
+            method: "TIMSetGroupTopicDeletedCallback",
+            manager: Managers.groupManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: data,
+        };
+
+        this._setCallback(callback, data.callback as unknown as Function);
+        return this._call<void>(formatedData);
+    }
+    TIMSetGroupTopicChangedCallback(data: TopicChangedParam) {
+        const callback = "TIMSetGroupTopicChangedCallback";
+        const formatedData = {
+            method: "TIMSetGroupTopicChangedCallback",
             manager: Managers.groupManager,
             callback,
             windowID: this._currentWindowID,
@@ -1250,7 +1400,42 @@ export default class TimRender {
             formatedData
         );
     }
+    TIMGroupSetGroupCounters(params: GroupCounterParams) {
+        const formatedData = {
+            method: "TIMGroupSetGroupCounters",
+            manager: Managers.groupManager,
+            param: params,
+        };
 
+        return this._call<commonResult<Array<GroupCounter>>>(formatedData);
+    }
+    TIMGroupGetGroupCounters(params: GetGroupCounterParams) {
+        const formatedData = {
+            method: "TIMGroupGetGroupCounters",
+            manager: Managers.groupManager,
+            param: params,
+        };
+
+        return this._call<commonResult<Array<GroupCounter>>>(formatedData);
+    }
+    TIMGroupIncreaseGroupCounter(params: IncreaseGroupCounterParam) {
+        const formatedData = {
+            method: "TIMGroupIncreaseGroupCounter",
+            manager: Managers.groupManager,
+            param: params,
+        };
+
+        return this._call<commonResult<Array<GroupCounter>>>(formatedData);
+    }
+    TIMGroupDecreaseGroupCounter(params: IncreaseGroupCounterParam) {
+        const formatedData = {
+            method: "TIMGroupDecreaseGroupCounter",
+            manager: Managers.groupManager,
+            param: params,
+        };
+
+        return this._call<commonResult<Array<GroupCounter>>>(formatedData);
+    }
     TIMGroupSearchGroups(searchGroupsParams: SearchGroupParams) {
         const formatedData = {
             method: "TIMGroupSearchGroups",
@@ -1825,18 +2010,6 @@ export default class TimRender {
         return this._call<commonResult<string>>(formatedData);
     }
 
-    TIMMsgDownloadElemToPath(
-        msgDownloadElemToPathParams: MsgDownloadElemToPathParams
-    ) {
-        const formatedData = {
-            method: "TIMMsgDownloadElemToPath",
-            manager: Managers.advanceMessageManager,
-            param: msgDownloadElemToPathParams,
-        };
-
-        return this._call<commonResult<DownloadElemResult>>(formatedData);
-    }
-
     TIMMsgDownloadMergerMessage(
         msgDownloadMergerMessageParams: MsgDownloadMergerMessageParams
     ) {
@@ -1917,32 +2090,113 @@ export default class TimRender {
         };
         return this._call<commonResult<string>>(formatedData);
     }
-
+    TIMMsgTranslateText(params: TranslateTextParam) {
+        const formatedData = {
+            method: "TIMMsgTranslateText",
+            manager: Managers.advanceMessageManager,
+            param: params,
+        };
+        return this._call<commonResult<Array<MessageTranslateTextResult>>>(
+            formatedData
+        );
+    }
+    TIMMsgConvertVoiceToText(params: ConvertVoiceToTextParam) {
+        const formatedData = {
+            method: "TIMMsgConvertVoiceToText",
+            manager: Managers.advanceMessageManager,
+            param: params,
+        };
+        return this._call<commonResult<string>>(formatedData);
+    }
+    recvNewMsgCallback(json_msg_array: string, user_data: string) {
+        for (let i = 0; i < TimRender._recvNewMsgCallbackArray.length; i++) {
+            let callback: Function = TimRender._recvNewMsgCallbackArray[i];
+            callback(json_msg_array, user_data);
+        }
+    }
+    downloadCallback(data: [0, "", "", ""]) {
+        for (let i = 0; i < TimRender._downloadCallbackArray.length; i++) {
+            let callback: Function = TimRender._downloadCallbackArray[i];
+            const [code, desc, json_param, user_data] = data;
+            callback(code, desc, json_param, user_data);
+        }
+    }
     TIMAddRecvNewMsgCallback(params: TIMRecvNewMsgCallbackParams) {
         const callback = "TIMAddRecvNewMsgCallback";
+        TimRender._recvNewMsgCallbackArray.push(params.callback);
+        let callbackparam: TIMRecvNewMsgCallbackParams = {
+            callback: this.recvNewMsgCallback,
+        };
         const formatedData = {
             method: "TIMAddRecvNewMsgCallback",
             manager: Managers.advanceMessageManager,
             callback,
             windowID: this._currentWindowID,
-            param: params,
+            param: callbackparam,
         };
 
-        this._setCallback(callback, params.callback);
+        // this._setCallback(callback, params.callback);
+        this._setCallback(callback, this.recvNewMsgCallback);
         return this._call<void>(formatedData);
+    }
+    TIMMsgDownloadElemToPath(
+        msgDownloadElemToPathParams: MsgDownloadElemToPathParams
+    ) {
+        TimRender._downloadCallbackArray.push(
+            msgDownloadElemToPathParams.callback
+        );
+        const callback = `TIMMsgDownloadElemToPath`; // 允许多次调用，所以这里加一个随机数
+        const formatedData = {
+            method: "TIMMsgDownloadElemToPath",
+            manager: Managers.advanceMessageManager,
+            param: msgDownloadElemToPathParams,
+            callback,
+            windowID: this._currentWindowID,
+        };
+        this._setCallback(callback, this.downloadCallback);
+        return this._call<void>(formatedData);
+    }
+    //callback(){//自己处理用户的callback，然后param.callback = callback}
+
+    deleteRecvNewMsgCallback(callback: Function) {
+        for (let i = 0; i < TimRender._recvNewMsgCallbackArray.length; i++) {
+            if (
+                TimRender._recvNewMsgCallbackArray[i].toString() ==
+                callback.toString()
+            ) {
+                TimRender._recvNewMsgCallbackArray.splice(i, 1);
+                break;
+            }
+        }
     }
 
     TIMRemoveRecvNewMsgCallback(params?: TIMRecvNewMsgCallbackParams) {
         const callback = "TIMRemoveRecvNewMsgCallback";
-        const formatedData = {
-            method: "TIMRemoveRecvNewMsgCallback",
-            manager: Managers.advanceMessageManager,
-            callback,
-            windowID: this._currentWindowID,
-            param: params,
-        };
+        if (params) {
+            this.deleteRecvNewMsgCallback(params.callback);
+            let callbackparam: TIMRecvNewMsgCallbackParams = {
+                callback: this.recvNewMsgCallback,
+            };
+            const formatedData = {
+                method: "TIMAddRecvNewMsgCallback",
+                manager: Managers.advanceMessageManager,
+                callback,
+                windowID: this._currentWindowID,
+                param: callbackparam,
+            };
+            this._setCallback(callback, this.recvNewMsgCallback);
+            return this._call<void>(formatedData);
+        } else {
+            const formatedData = {
+                method: "TIMRemoveRecvNewMsgCallback",
+                manager: Managers.advanceMessageManager,
+                callback,
+                windowID: this._currentWindowID,
+                param: params,
+            };
 
-        return this._call<void>(formatedData);
+            return this._call<void>(formatedData);
+        }
     }
 
     TIMSetMsgReadedReceiptCallback(params: TIMMsgReadedReceiptCallbackParams) {
@@ -2031,6 +2285,163 @@ export default class TimRender {
         return this._call<void>(formatedData);
     }
 
+    TIMInvite(params: inviteParam) {
+        const formatedData = {
+            method: "TIMInvite",
+            manager: Managers.signalingManager,
+            param: params,
+        };
+
+        return this._call<commonResult<string>>(formatedData);
+    }
+
+    TIMInviteInGroup(params: inviteInGroupParam) {
+        const formatedData = {
+            method: "TIMInviteInGroup",
+            manager: Managers.signalingManager,
+            param: params,
+        };
+
+        return this._call<commonResult<string>>(formatedData);
+    }
+
+    TIMCancelInvite(params: signalingParam) {
+        const formatedData = {
+            method: "TIMCancelInvite",
+            manager: Managers.signalingManager,
+            param: params,
+        };
+
+        return this._call<commonResult<string>>(formatedData);
+    }
+
+    TIMAcceptInvite(params: signalingParam) {
+        const formatedData = {
+            method: "TIMAcceptInvite",
+            manager: Managers.signalingManager,
+            param: params,
+        };
+
+        return this._call<commonResult<string>>(formatedData);
+    }
+
+    TIMRejectInvite(params: signalingParam) {
+        const formatedData = {
+            method: "TIMRejectInvite",
+            manager: Managers.signalingManager,
+            param: params,
+        };
+
+        return this._call<commonResult<string>>(formatedData);
+    }
+
+    TIMGetSignalingInfo(params: getSignalingInfoParam) {
+        const formatedData = {
+            method: "TIMGetSignalingInfo",
+            manager: Managers.signalingManager,
+            param: params,
+        };
+
+        return this._call<commonResult<SignalingInfo>>(formatedData);
+    }
+
+    TIMSignalingModifyInvitation(params: signalingParam) {
+        const formatedData = {
+            method: "TIMSignalingModifyInvitation",
+            manager: Managers.signalingManager,
+            param: params,
+        };
+
+        return this._call<commonResult<string>>(formatedData);
+    }
+
+    TIMOnInvited(param: SetSignalingReceiveNewInvitationCallbackParam) {
+        const callback = `TIMOnInvited`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMOnInvited",
+            manager: Managers.signalingManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+    TIMOnAccepted(param: SetSignalingInviteeAcceptedCallbackParam) {
+        const callback = `TIMOnAccepted`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMOnAccepted",
+            manager: Managers.signalingManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+    TIMOnRejected(param: SetSignalingInviteeRejectedCallbackParam) {
+        const callback = `TIMOnRejected`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMOnRejected",
+            manager: Managers.signalingManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+
+    TIMOnCancelled(param: SetSignalingInvitationCancelledCallbackParam) {
+        const callback = `TIMOnCancelled`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMOnCancelled",
+            manager: Managers.signalingManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+
+    TIMOnTimeout(param: SetSignalingInvitationTimeoutCallParam) {
+        const callback = `TIMOnTimeout`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMOnTimeout",
+            manager: Managers.signalingManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
+
+    TIMOnModified(param: SetSignalingInvitationModifiedCallback) {
+        const callback = `TIMOnModified`;
+        this._setCallback(callback, param.callback);
+        //@ts-ignore
+        param.callback = callback;
+        const formatedData = {
+            method: "TIMOnModified",
+            manager: Managers.signalingManager,
+            callback,
+            windowID: this._currentWindowID,
+            param: param,
+        };
+        return this._call<any>(formatedData);
+    }
     private _getSignalCustomData(param: customDataTpl) {
         const {
             inviter,
@@ -2053,325 +2464,5 @@ export default class TimRender {
             groupID: groupID,
         };
         return tpl;
-    }
-    private async _setCallingTimeout(
-        inviteID: string,
-        isRec: boolean,
-        message: any
-    ) {
-        const callInfo = deepClone(await this._getCallInfo(inviteID));
-
-        if (callInfo) {
-            const { message_server_time } = message;
-            const { timeout } = callInfo;
-            if (timeout && timeout > 0) {
-                const interVal = setInterval(async () => {
-                    const startTime = new Date().getTime();
-                    //@ts-ignore
-                    const { data: currentServerTime } =
-                        await this.TIMGetServerTime();
-
-                    const endTime = new Date().getTime();
-                    const diffTime = endTime - startTime;
-                    const isTimeout =
-                        currentServerTime * 1000 -
-                            diffTime -
-                            message_server_time * 1000 >=
-                        timeout * 1000;
-
-                    if (isTimeout) {
-                        this._timeout(inviteID, isRec);
-                        clearInterval(interVal);
-                    }
-                }, 600);
-            }
-        }
-    }
-    private async _timeout(inviteID: string, isRec: boolean) {
-        const callInfo = deepClone(await this._getCallInfo(inviteID));
-        if (callInfo) {
-            const { inviteeList, groupID, inviter } = callInfo;
-            callInfo.actionType = ActionType.INVITE_TIMEOUT;
-            // @ts-ignore
-            const userID = (await this.TIMGetLoginUserID({})).json_param;
-            const senderID = userID == undefined ? "" : userID;
-            if (inviteeList.length > 0) {
-                if (isRec) {
-                    if (inviteeList.includes(senderID)) {
-                        callInfo.inviteeList = [senderID];
-                    } else {
-                        return;
-                    }
-                }
-                const {
-                    //@ts-ignore
-                    data: { code, json_params },
-                } = await this._sendCumtomMessage(
-                    groupID
-                        ? groupID
-                        : inviter === senderID
-                        ? inviteeList[0]
-                        : inviter,
-                    senderID,
-                    callInfo,
-                    groupID ? true : false
-                );
-                if (code === 0) {
-                    this._onTimeouted(inviteID, callInfo, json_params); // 让自己也知道超时了
-                    await this._deleteCallInfo(inviteID);
-                }
-            }
-        }
-    }
-    private async _sendCumtomMessage(
-        userID: string,
-        senderID: string,
-        customData: object,
-        isGroup?: boolean
-    ) {
-        return this.TIMMsgSendMessage({
-            conv_id: userID,
-            conv_type: isGroup
-                ? TIMConvType.kTIMConv_Group
-                : TIMConvType.kTIMConv_C2C,
-            params: {
-                message_elem_array: [
-                    {
-                        elem_type: 3, // 自定义消息
-                        custom_elem_data: JSON.stringify(customData),
-                        custom_elem_desc: "",
-                        custom_elem_ext: "",
-                        custom_elem_sound: "",
-                    },
-                ],
-                message_sender: senderID,
-            },
-        });
-    }
-    // TRTCCalling start
-    TIMInvite(param: TRTCCallingCallParam) {
-        return new Promise(async (resolve, reject) => {
-            const {
-                userID,
-                senderID,
-                timeout = 30,
-                data = JSON.stringify({}),
-            } = param;
-            const inviteID = uuidv4();
-            const customData = this._getSignalCustomData({
-                inviter: senderID,
-                inviteeList: [userID],
-                actionType: ActionType.INVITE,
-                inviteID,
-                timeout,
-                data,
-            });
-            const res = await this._sendCumtomMessage(
-                userID,
-                senderID,
-                customData
-            );
-            console.log(res);
-            // @ts-ignore
-            // const { code, json_params } = res.data;
-            const { code, json_params } = res;
-            if (code === 0) {
-                const message = json_params;
-                await this._setCallInfo(inviteID, customData);
-                if (timeout > 0) {
-                    this._setCallingTimeout(inviteID, false, message);
-                }
-                resolve({
-                    inviteID,
-                    ...res,
-                });
-            } else {
-                reject(res);
-            }
-        });
-    }
-
-    TIMInviteInGroup(param: TRTCCallingCallGroupParam) {
-        return new Promise(async (resolve, reject) => {
-            const { userIDs, senderID, timeout = 30, groupID, data } = param;
-            const inviteID = uuidv4();
-            const customData = this._getSignalCustomData({
-                inviter: senderID,
-                inviteeList: userIDs,
-                actionType: ActionType.INVITE,
-                inviteID,
-                timeout,
-                groupID,
-                data,
-            });
-            const res = await this._sendCumtomMessage(
-                groupID,
-                senderID,
-                customData,
-                true
-            );
-            // @ts-ignore
-            // const { code, json_params } = res.data;
-            const { code, json_params } = res;
-
-            if (code === 0) {
-                const message = json_params;
-                await this._setCallInfo(inviteID, customData);
-                if (timeout > 0) {
-                    this._setCallingTimeout(inviteID, false, message);
-                }
-                resolve({
-                    inviteID,
-                    ...res,
-                });
-            } else {
-                reject(res);
-            }
-        });
-    }
-
-    TIMAcceptInvite(param: handleParam) {
-        return new Promise(async (resolve, reject) => {
-            const { inviteID, data } = param;
-            const callInfo = deepClone(await this._getCallInfo(inviteID));
-            if (callInfo) {
-                const { groupID, inviter } = callInfo;
-                callInfo.actionType = ActionType.ACCEPT_INVITE;
-                callInfo.data = data;
-                // @ts-ignore
-                const userID = (await this.TIMGetLoginUserID({})).json_param;
-                const senderID = userID == undefined ? "" : userID;
-                callInfo.inviteeList = [senderID];
-                const res = await this._sendCumtomMessage(
-                    groupID ? groupID : inviter,
-                    senderID,
-                    callInfo,
-                    groupID ? true : false
-                );
-                // @ts-ignore
-                // const { code } = res.data;
-                const { code } = res;
-                if (code === 0) {
-                    // 如果没人了，移除本地维护的数据
-                    const localInfo = deepClone(
-                        await this._getCallInfo(inviteID)
-                    );
-                    //@ts-ignore
-                    const { inviteeList: localInviteeList } = localInfo;
-                    const newInviteeList =
-                        localInviteeList?.filter(
-                            (item: any) => item !== senderID
-                        ) || [];
-                    log.info(
-                        `info: ${JSON.stringify(localInfo)},${newInviteeList}`
-                    );
-                    if (newInviteeList.length > 0) {
-                        // @ts-ignore
-                        localInfo.inviteeList = newInviteeList;
-                        await this._setCallInfo(inviteID, localInfo);
-                    } else {
-                        await this._deleteCallInfo(inviteID);
-                    }
-                    resolve({
-                        inviteID,
-                        ...res,
-                    });
-                } else {
-                    reject(res);
-                }
-            } else {
-                reject({
-                    code: 8010,
-                    desc: "inviteID is invalid or invitation has been processed",
-                });
-            }
-        });
-    }
-    TIMRejectInvite(param: handleParam) {
-        return new Promise(async (resolve, reject) => {
-            const { inviteID, data } = param;
-            const callInfo = deepClone(await this._getCallInfo(inviteID));
-            if (callInfo) {
-                const { groupID, inviter } = callInfo;
-                callInfo.actionType = ActionType.REJECT_INVITE;
-                callInfo.data = data;
-                // @ts-ignore
-                const userID = (await this.TIMGetLoginUserID({})).json_param;
-                const senderID = userID == undefined ? "" : userID;
-                callInfo.inviteeList = [senderID];
-                const res = await this._sendCumtomMessage(
-                    groupID ? groupID : inviter,
-                    senderID,
-                    callInfo,
-                    groupID ? true : false
-                );
-                // @ts-ignore
-                // const { code } = res.data;
-                const { code } = res;
-                if (code === 0) {
-                    // 如果没人了，移除本地维护的数据
-                    // @ts-ignore
-                    const { inviteeList: localInviteeList } =
-                        await this._getCallInfo(inviteID);
-                    const newInviteeList = localInviteeList?.filter(
-                        (item: any) => item !== senderID
-                    );
-                    if (newInviteeList.length > 0) {
-                        callInfo.inviteeList = newInviteeList;
-                        await this._setCallInfo(inviteID, callInfo);
-                    } else {
-                        await this._deleteCallInfo(inviteID);
-                    }
-                    resolve({
-                        inviteID,
-                        ...res,
-                    });
-                } else {
-                    reject(res);
-                }
-            } else {
-                reject({
-                    code: 8010,
-                    desc: "inviteID is invalid or invitation has been processed",
-                });
-            }
-        });
-    }
-    TIMCancelInvite(param: handleParam) {
-        return new Promise(async (resolve, reject) => {
-            const { inviteID, data } = param;
-            const callInfo = deepClone(await this._getCallInfo(inviteID));
-            if (callInfo) {
-                const { inviteeList, groupID } = callInfo;
-                callInfo.actionType = ActionType.CANCEL_INVITE;
-                callInfo.data = data;
-                // @ts-ignore
-                const userID = (await this.TIMGetLoginUserID({})).json_param;
-                const senderID = userID == undefined ? "" : userID;
-                const res = await this._sendCumtomMessage(
-                    groupID ? groupID : inviteeList[0],
-                    senderID,
-                    callInfo,
-                    groupID ? true : false
-                );
-                // @ts-ignore
-                // const { code } = res.data;
-                const { code } = res;
-                if (code === 0) {
-                    await this._deleteCallInfo(inviteID);
-                    resolve({
-                        inviteID,
-                        ...res,
-                    });
-                } else {
-                    reject(res);
-                }
-            } else {
-                reject({
-                    code: 8010,
-                    desc: "inviteID is invalid or invitation has been processed",
-                });
-            }
-        });
     }
 }

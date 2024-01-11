@@ -4,10 +4,14 @@ const path = require('path')
 const TimMain = require('./im_electron_sdk/dist/main');
 // const TimMain = require('im_electron_sdk/dist/main');
 // const TIM = require('./im_electron_sdk/dist/tim')
+const url = require("url")
 const mainInstance = new TimMain({
   sdkappid: 0
 })
-
+crashReporter.start({
+  submitURL:"http://127.0.0.1/upload"
+});
+// console.log("crash",crashReporter.getLastCrashReport().id);
 function createWindow() {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -25,15 +29,15 @@ function createWindow() {
   })
   mainInstance.enable(mainWindow.webContents);
   // and load the index.html of the app.
-  // mainWindow.loadURL(
-  //   url.format({
-  //     pathname: path.join(__dirname, './client/build/index.html'),
-  //     protocol: 'file:',
-  //     slashes: true
-  //   })
-  // )
+  mainWindow.loadURL(
+    url.format({
+      pathname: path.join(__dirname, './client/build/index.html'),
+      protocol: 'file:',
+      slashes: true
+    })
+  )
 
-  mainWindow.loadURL('http://localhost:3000')
+  // mainWindow.loadURL('http://localhost:3000')
 
   // mainWindow.loadFile(path.resolve(__dirname,'./test.html'))
 

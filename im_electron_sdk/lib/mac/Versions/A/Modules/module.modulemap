@@ -1,5 +1,5 @@
-framework module ImSDKForMac_Plus {
-  umbrella header "ImSDKForMac_Plus.h"
+framework module ImSDKForMac {
+  umbrella header "ImSDKForMac.h"
 
   export *
   module * { export * }

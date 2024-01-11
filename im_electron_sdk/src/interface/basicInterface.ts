@@ -30,7 +30,6 @@ interface initConfig {
 interface sdkconfig {
     sdkappid: number;
     consoleTag: string;
-    Imsdklib: libMethods;
 }
 /**
  * @param {TIMResult | TIMErrCode} code code：返回状态码 每个返回值的定义请参考 [IM文档](https://cloud.tencent.com/document/product/269/1671)
@@ -75,6 +74,28 @@ interface TIMSetKickedOfflineCallback {
 interface TIMSetUserSigExpiredCallback {
     (user_data: string): void;
 }
+
+/**
+ * @param json_user_profile 当前用户的资料，请参考[TIMUserStatus]
+ */
+interface TIMSelfInfoUpdatedCallback {
+    (json_user_profile: string, user_data?: string): void;
+}
+
+interface TIMSetSelfInfoUpdatedCallbackParam {
+    callback: TIMSelfInfoUpdatedCallback;
+    user_data?: string;
+}
+
+interface TIMUserStatusChangedCallback {
+    (json_user_status_array: string, user_data?: string): void;
+}
+
+interface TIMSetUserStatusChangedCallbackParam {
+    callback: TIMUserStatusChangedCallback;
+    user_data?: string;
+}
+
 /**
  * @param {TIMSetNetworkStatusListenerCallback} callback callback
  * @param {string} user_data user_data户自定义数据，ImSDK只负责传回给回调函数cb，不做任何处理
@@ -131,7 +152,7 @@ interface GroupMemberInfoOption {
  * @brief 用于配置信息
  * @param {boolean} user_config_is_read_receipt user_config_is_read_receipt：true表示要收已读回执事件
  * @param {boolean} user_config_is_sync_report user_config_is_sync_report：true表示服务端要删掉已读状态
- * @param {boolean} user_config_is_ingore_grouptips_unread user_config_is_ingore_grouptips_unread：true表示群tips不计入群消息已读计数
+ * @param {boolean} user_config_is_ignore_grouptips_unread user_config_is_ingore_grouptips_unread：true表示群tips不计入群消息已读计数
  * @param {boolean} user_config_is_is_disable_storage user_config_is_is_disable_storage：是否禁用本地数据库，true表示禁用，false表示不禁用。默认是false
  * @param {boolean} user_config_group_getinfo_option user_config_group_getinfo_option：获取群组信息默认选项
  * @param {boolean} user_config_group_member_getinfo_option user_config_group_member_getinfo_option：获取群组成员信息默认选项
@@ -139,7 +160,7 @@ interface GroupMemberInfoOption {
 interface UserConfig {
     user_config_is_read_receipt?: boolean;
     user_config_is_sync_report?: boolean;
-    user_config_is_ingore_grouptips_unread?: boolean;
+    user_config_is_ignore_grouptips_unread?: boolean;
     user_config_is_is_disable_storage?: boolean;
     user_config_group_getinfo_option?: GroupGetInfoConfig;
     user_config_group_member_getinfo_option?: GroupMemberInfoOption;
@@ -332,7 +353,49 @@ interface cache {
 }
 interface initParam {
     config_path?: string;
+    electron_log?: boolean;
 }
+interface userStatusParam {
+    id_array: string[];
+    user_data?: string;
+}
+/**
+ * @brief 用户状态
+ * @param user_status_identifier 只读, 用户 ID
+ * @param user_status_status_type 用户的状态,请参考TIMUserStatusType
+ * @param user_status_custom_status 用户的自定义状态
+ */
+interface userStatus {
+    user_status_identifier: string;
+    user_status_status_type: number;
+    user_status_custom_status: string;
+}
+interface setSelfStatusParam {
+    status: {
+        user_status_custom_status: string;
+    };
+    user_data?: string;
+}
+
+/**
+ * @param json_user_id_list 待订阅的用户ID列表
+ */
+interface SubscribeUserInfoParam {
+    json_user_id_list: string[];
+    user_data?: string;
+}
+/**
+ * @param json_user_info_array 用户资料更新列表，用户资料请参考[UserProfile]
+ */
+interface TIMUserInfoChangedCallback {
+    (json_user_info_array: string, user_data: string): void;
+}
+
+interface UserInfoChangedCallbackParam {
+    callback: TIMUserInfoChangedCallback;
+    user_data?: string;
+}
+
 export {
     initParam,
     initConfig,
@@ -355,4 +418,14 @@ export {
     cache,
     CommonCallbackFuns,
     GroupReadMembersCallback,
+    TIMSelfInfoUpdatedCallback,
+    TIMUserStatusChangedCallback,
+    TIMSetSelfInfoUpdatedCallbackParam,
+    TIMSetUserStatusChangedCallbackParam,
+    userStatusParam,
+    userStatus,
+    setSelfStatusParam,
+    SubscribeUserInfoParam,
+    TIMUserInfoChangedCallback,
+    UserInfoChangedCallbackParam,
 };

@@ -8,6 +8,7 @@ enum Managers {
     conversationManager = "conversationManager",
     friendshipManager = "friendshipManager",
     groupManager = "groupManager",
+    signalingManager = "signalingManager",
 }
 interface ipcData<T> {
     method: string;

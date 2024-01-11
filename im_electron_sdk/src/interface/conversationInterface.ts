@@ -24,6 +24,8 @@ import { GroupAtInfo } from "./groupInterface";
  * @param conv_mark_array  conv_mark_array 会话标记列表,请参考[TIMConversationMarkType]
  * @param conv_custom_data  conv_custom_data  会话自定义数据（从 6.5 版本开始支持）
  * @param conv_conversation_group_array   conv_conversation_group_array 会话所属分组列表（从 6.5 版本开始支持）
+ * @param conv_c2c_read_timestamp C2C 会话已读消息时间戳（从 7.1 版本开始支持）
+ * @param conv_group_read_sequence 只读, 群消息已读 Sequence（从 7.1 版本开始支持）
  */
 interface convInfo {
     conv_id: string;
@@ -42,6 +44,8 @@ interface convInfo {
     conv_mark_array: Array<TIMConversationMarkType>;
     conv_custom_data: string;
     conv_conversation_group_array: Array<string>;
+    conv_c2c_read_timestamp: number;
+    conv_group_read_sequence: number;
 }
 
 /**
@@ -175,6 +179,11 @@ interface convTotalUnreadMessageCountChangedCallbackParam {
     user_data?: string;
 }
 
+interface convUnreadMessageCountChangedByFilterCallbackParam {
+    callback: convTotalUnreadMessageCountChangedByFilterCallback;
+    user_data?: string;
+}
+
 /**
  * @breif 获取会话列表高级接口的 filter
  * @param conversation_list_filter_conv_type 只写, 会话类型
@@ -186,13 +195,38 @@ interface convTotalUnreadMessageCountChangedCallbackParam {
 interface TIMConversationListFilter {
     params: {
         conversation_list_filter_conv_type: TIMConvType;
-        conversation_list_filter_next_seq: number;
-        conversation_list_filter_count: number;
+        conversation_list_filter_next_seq?: number;
+        conversation_list_filter_count?: number;
         conversation_list_filter_mark_type?: TIMConversationMarkType;
-        conversation_list_filter_group_name?: string;
+        conversation_list_filter_conversation_group?: string;
     };
     user_data?: string;
 }
+
+/**
+ * @brief 清理回话未读消息计数的参数
+ * @param conversation_id  会话唯一 ID， C2C 单聊组成方式："c2c_" + userID；群聊组成方式为 "group_" + groupID
+ * @param clean_timestamp  清理时间戳，仅对单聊会话生效，指定清理哪一个 timestamp 之前的未读消息计数；当传入为 0 时，对应会话所有的未读消息将被清理，会话的未读数会清 0；
+ * @param clean_sequence  清理时 sequence，仅对群聊会话生效，指定清理哪一个 sequence 之前的未读消息计数；当传入为 0 时，对应会话所有的未读消息将被清理，会话的未读数会清 0；
+ */
+interface CleanUnreadMessageCoutParam {
+    conversation_id: string;
+    clean_timestamp: number;
+    clean_sequence: number;
+    user_data?: string;
+}
+
+/**
+ * @brief 删除会话列表参数
+ * @param conversation_id_array 会话 ID 列表。需要在会话ID之前加上“c2c_”或“group_”字样
+ * @param clearMessage 是否删除会话中的消息；false为保留会话消息，true为本地和服务器的消息会一起删除，并且不可恢复
+ */
+interface DeleteConvListParam {
+    conversation_id_array: string[];
+    clearMessage: boolean;
+    user_data?: string;
+}
+
 /**
  * @breif 获取会话列表的结果
  * @param conversation_list_result_conv_list 只读, 会话列表
@@ -305,6 +339,46 @@ interface convTotalUnreadMessageCountChangedCallback {
     (total_unread_count: number, user_data: string): void;
 }
 
+/**
+ * @brief 按会话 filter 过滤的未读消息总数变化
+ * @param filter 获取未读总数的 filter，详见TIMConversationListFilter(param内的参数部分)
+ * @param total_unread_count 未读的消息总数
+ * @param user_data ImSDK负责透传的用户自定义数据，未做任何处理
+ */
+interface convTotalUnreadMessageCountChangedByFilterCallback {
+    (filter: string, total_unread_count: number, user_data: string): void;
+}
+
+interface convGroupCreatedCallbackParam {
+    callback: TIMConvConversationGroupCreatedCallback;
+    user_data?: string;
+}
+/**
+ * @param group_name 分组名
+ * @param conversation_array 会话列表
+ */
+interface TIMConvConversationGroupCreatedCallback {
+    (group_name: string, conversation_array: string, user_data: string): void;
+}
+
+interface convGroupDeletedCallbackParam {
+    callback: TIMConvConversationGroupDeletedCallback;
+    user_data?: string;
+}
+
+interface TIMConvConversationGroupDeletedCallback {
+    (group_name: string): void;
+}
+
+interface convGroupNameChangedCallback {
+    callback: TIMConvConversationGroupNameChangedCallback;
+    user_data?: string;
+}
+
+interface TIMConvConversationGroupNameChangedCallback {
+    (old_name: string, new_name: string, user_data: string): void;
+}
+
 export {
     convInfo,
     totalUnreadCountResult,
@@ -334,4 +408,14 @@ export {
     renameConvGroupParam,
     convGroupListResult,
     setConvCustomDataParam,
+    CleanUnreadMessageCoutParam,
+    DeleteConvListParam,
+    convUnreadMessageCountChangedByFilterCallbackParam,
+    convTotalUnreadMessageCountChangedByFilterCallback,
+    convGroupCreatedCallbackParam,
+    convGroupDeletedCallbackParam,
+    convGroupNameChangedCallback,
+    TIMConvConversationGroupCreatedCallback,
+    TIMConvConversationGroupDeletedCallback,
+    TIMConvConversationGroupNameChangedCallback,
 };

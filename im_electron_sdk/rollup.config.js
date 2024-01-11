@@ -32,6 +32,17 @@ function getEnvConfigData(format,isUglify){
       ]
     },
     {
+      input: resolve('./src/timMain.ts'),
+      output: {
+        format: format,
+        file: resolve('./dist/main.d.ts'),
+        name: 'rem',
+      },
+      plugins: [
+        dts()
+      ]
+    },
+    {
       input: resolve('./src/timRender.ts'),
       output: {
         format: format,

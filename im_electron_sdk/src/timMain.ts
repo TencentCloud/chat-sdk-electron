@@ -7,6 +7,7 @@ import TIM from "./tim";
 import path from "path";
 import os from "os";
 import { escapeUnicode, mkdirsSync } from "./utils/utils";
+import TimbaseManager from "./manager/timbaseManager";
 // import log from "./utils/log";
 const log = {
     info: function (...args: any) {},
@@ -43,6 +44,9 @@ class Callback {
             case "groupManager":
                 timManager = this.tim.getGroupManager();
                 break;
+            case "signalingManager":
+                timManager = this.tim.getSignalingManager();
+                break;
             default:
                 throw new Error("no such manager,check and try again.");
         }
@@ -52,15 +56,14 @@ class Callback {
     async getResponse(cb?: Function) {
         const startTime = Date.now();
         const { method, param, callback } = this.requestData;
-        console.log("requestData:", this.requestData);
         const timManager = this.getManager();
         if (timManager && timManager[method]) {
             try {
                 let responseData;
                 if (callback) {
-                    console.log(
-                        "===========add callback successfully=========="
-                    );
+                    // console.log(
+                    //     "===========add callback successfully=========="
+                    // );
                     //@ts-ignore
                     if (param) {
                         param.callback = cb;
@@ -76,13 +79,13 @@ class Callback {
                     responseData = err;
                 }
 
-                console.log(
-                    `${CONSOLETAG}${method} is called . use ${
-                        Date.now() - startTime
-                    } ms.`,
-                    `param：${param}`,
-                    `data：${responseData}`
-                );
+                // console.log(
+                //     `${CONSOLETAG}${method} is called . use ${
+                //         Date.now() - startTime
+                //     } ms.`,
+                //     `param：${param}`,
+                //     `data：${responseData}`
+                // );
                 // if (responseData) {
                 //     if (responseData.json_param) {
                 //         responseData.json_param = escapeUnicode(
@@ -95,11 +98,31 @@ class Callback {
                 //         );
                 //     }
                 // }
+                var logReq = param;
+                var logRes = responseData;
+                try {
+                    logReq = JSON.stringify(param);
+                } catch (err) {
+                    console.log("write logReq to file error");
+                }
+                try {
+                    logRes = JSON.stringify(responseData);
+                } catch (err) {
+                    console.log("write logReq to file error");
+                }
+                TimbaseManager._writeLog(
+                    JSON.stringify({
+                        param: logReq,
+                        response: logRes,
+                    }),
+                    method
+                );
                 return JSON.stringify({ callback, data: responseData });
             } catch (error) {
                 console.log("some errors", error);
             }
         }
+
         throw new Error("no such method , check and try again.");
     }
 }
@@ -140,7 +163,7 @@ class TimMain {
                     }
 
                     cb = (...args: any) => {
-                        console.log("callback-response", method);
+                        // console.log("callback-response", method);
                         if (TimMain.event.get(callback)) {
                             try {
                                 const replayCbs = TimMain.event.get(callback);
@@ -148,9 +171,9 @@ class TimMain {
                                     log.info(
                                         `${callback} window ${item} replay`
                                     );
-                                    console.log(
-                                        `${callback} window ${item} replay`
-                                    );
+                                    // console.log(
+                                    //     `${callback} window ${item} replay`
+                                    // );
                                     // if (args && args.length) {
                                     //     for (let i = 0; i < args.length; i++) {
                                     //         if (args[i].json_param) {
@@ -174,6 +197,10 @@ class TimMain {
                                                 callbackKey: callback,
                                                 responseData: args,
                                             })
+                                        );
+                                        TimbaseManager._writeLog(
+                                            JSON.stringify(args),
+                                            callback
                                         );
                                     } catch (err) {
                                         log.error("渲染进程丢失", err);
@@ -248,12 +275,12 @@ class TimMain {
         require("@electron/remote/main").enable(webContents);
     }
     setSDKAPPID(sdkappid: number) {
-        console.log(`更新sdkappid ${sdkappid}`);
         this._tim.setSDKAPPID(sdkappid);
         this._tim.getAdvanceMessageManager().setSDKAPPID(sdkappid);
         this._tim.getConversationManager().setSDKAPPID(sdkappid);
         this._tim.getFriendshipManager().setSDKAPPID(sdkappid);
         this._tim.getTimbaseManager().setSDKAPPID(sdkappid);
+        this._tim.getSignalingManager().setSDKAPPID(sdkappid);
     }
 }
 export default TimMain;

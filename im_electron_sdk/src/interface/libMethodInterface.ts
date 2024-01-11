@@ -1,4 +1,5 @@
 import { TIMConvType, TIMReceiveMessageOpt } from "../enum";
+import { FriendshipStringArrayParams } from "./friendshipInterface";
 
 interface TIMInitFun {
     (sdkappid: number, sdkconfig: string): number;
@@ -46,6 +47,13 @@ interface TIMSetUserSigExpiredCallbackFun {
     (callback: Buffer, user_data?: string): number;
 }
 
+interface TIMSetSelfInfoUpdatedCallback {
+    (callback: Buffer, user_data?: string): number;
+}
+interface TIMSetUserStatusChangedCallback {
+    (callback: Buffer, user_data?: string): number;
+}
+
 // ==========Interface For Conversation Start===========
 interface TIMConvCreateFun {
     (
@@ -65,6 +73,14 @@ interface TIMConvCancelDraftFun {
     (conv_id: string, conv_type: number): number;
 }
 interface TIMConvDeleteFun extends TIMConvCreateFun {}
+interface TIMConvDeleteConversationList {
+    (
+        conversation_id_array: string,
+        clearMessage: boolean,
+        callback: Buffer,
+        user_data?: string
+    ): number;
+}
 interface TIMConvGetConvInfoFun {
     (
         json_get_conv_list_param: string,
@@ -89,6 +105,27 @@ interface TIMSetConvEventCallbackFun {
 }
 interface TIMSetConvTotalUnreadMessageCountChangedCallbackFun {
     (callback: Buffer, user_data?: string): number;
+}
+interface TIMSetConvUnreadMessageCountChangedByFilterCallback {
+    (callback: Buffer, user_data?: string): number;
+}
+interface TIMConvGetUnreadMessageCountByFilter {
+    (filter: string, callback: Buffer, user_data?: string): number;
+}
+interface TIMConvSubscribeUnreadMessageCountByFilter {
+    (filter: string): number;
+}
+interface TIMConvUnsubscribeUnreadMessageCountByFilter {
+    (filter: string): number;
+}
+interface TIMConvCleanConversationUnreadMessageCount {
+    (
+        conversation_id: string,
+        clean_timestamp: number,
+        clean_sequence: number,
+        callback: Buffer,
+        user_data?: string
+    ): number;
 }
 interface TIMConvGetConversationListByFilter {
     (
@@ -201,6 +238,40 @@ interface TIMGroupHandlePendencyFun extends TIMGroupCreateFun {}
 
 interface TIMGroupGetOnlineMemberCountFun extends TIMGroupDeleteFun {}
 
+interface TIMGroupSetGroupCounters {
+    (
+        groupId: string,
+        json_group_counter_array: string,
+        callback: Buffer,
+        user_data?: string
+    ): number;
+}
+interface TIMGroupGetGroupCounters {
+    (
+        groupId: string,
+        json_group_counter_key_array: string,
+        callback: Buffer,
+        user_data?: string
+    ): number;
+}
+interface TIMGroupIncreaseGroupCounter {
+    (
+        group_id: string,
+        group_counter_key: string,
+        group_counter_value: number,
+        callback: Buffer,
+        user_data?: string
+    ): number;
+}
+interface TIMGroupDecreaseGroupCounter {
+    (
+        group_id: string,
+        group_counter_key: string,
+        group_counter_value: number,
+        callback: Buffer,
+        user_data?: string
+    ): number;
+}
 interface TIMGroupSearchGroupsFun extends TIMGroupCreateFun {}
 
 interface TIMGroupSearchGroupMembersFun extends TIMGroupCreateFun {}
@@ -230,7 +301,63 @@ interface TIMSetGroupTipsEventCallbackFun {
 interface TIMSetGroupAttributeChangedCallbackFun {
     (callback: Buffer, user_data?: string): void;
 }
-
+interface TIMSetGroupCounterChangedCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetGroupTopicCreatedCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetGroupTopicDeletedCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetGroupTopicChangedCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetConvConversationGroupCreatedCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetConvConversationGroupDeletedCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetConvConversationGroupNameChangedCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetConvConversationsAddedToGroupCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetConvConversationsDeletedFromGroupCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMGroupGetJoinedCommunityList {
+    (callback: Buffer, user_data?: string): number;
+}
+interface TIMGroupCreateTopicInCommunity {
+    (
+        group_id: string,
+        json_topic_info: string,
+        callback: Buffer,
+        user_data?: string
+    ): number;
+}
+interface TIMGroupDeleteTopicFromCommunity {
+    (
+        group_id: string,
+        json_topic_info: string,
+        callback: Buffer,
+        user_data?: string
+    ): number;
+}
+interface TIMGroupSetTopicInfo {
+    (json_topic_info: string, callback: Buffer, user_data?: string): number;
+}
+interface TIMGroupGetTopicInfoList {
+    (
+        group_id: string,
+        json_topic_id_array: string,
+        callback: Buffer,
+        user_data?: string
+    ): number;
+}
 // ==========Interface For Group End===========
 // ==========Interface For friendship begin===========
 interface TIMFriendshipGetFriendProfileListFun {
@@ -562,6 +689,25 @@ interface TIMProfileGetUserProfileListFun {
 interface TIMProfileModifySelfUserProfileFun {
     (json_param: string, callback: Buffer, user_data: string): number;
 }
+interface TIMGetUserStatus {
+    (json_param: string, callback: Buffer, user_data: string): number;
+}
+interface TIMSetSelfStatus {
+    (json_param: string, callback: Buffer, user_data: string): number;
+}
+interface TIMSubscribeUserStatus {
+    (json_param: string, callback: Buffer, user_data: string): number;
+}
+interface TIMUnsubscribeUserStatus {
+    (json_param: string, callback: Buffer, user_data: string): number;
+}
+
+interface TIMSubscribeUserInfo {
+    (json_user_id_list: string, callback: Buffer, user_data: string): number;
+}
+interface TIMSetUserInfoChangedCallback {
+    (callback: Buffer, user_data?: string): void;
+}
 // ==========Interface For friendship End===========
 
 interface TIMMsgSendMessageReadReceiptsFun {
@@ -600,10 +746,86 @@ interface TIMMsgDeleteMessageExtensionsNative {
         user_data: string
     ): number;
 }
+
+interface TIMMsgTranslateText {
+    (
+        json_source_text_array: string,
+        source_language: string,
+        target_language: string,
+        cb: Buffer,
+        user_data: string
+    ): number;
+}
+interface TIMMsgConvertVoiceToText {
+    (url: string, language: string, cb: Buffer, user_data: string): number;
+}
 interface TIMMsgSetOfflinePushToken {
     (json_token: string, cb: Buffer, user_data: string): number;
 }
 
+interface TIMSignalingInvite {
+    (
+        invitee: string,
+        data: string,
+        online_user_only: boolean,
+        json_offline_push_info: string,
+        timeout: number,
+        invite_id_buffer: ArrayBuffer,
+        cb: Buffer,
+        user_data?: string
+    ): number;
+}
+
+interface TIMSignalingInviteInGroup {
+    (
+        group_id: string,
+        json_invitee_array: string,
+        data: string,
+        online_user_only: boolean,
+        timeout: number,
+        invite_id_buffer: ArrayBuffer,
+        cb: Buffer,
+        user_data?: string
+    ): number;
+}
+
+interface TIMSignalingCancel {
+    (invite_id: string, data: string, cb: Buffer, user_data?: string): number;
+}
+
+interface TIMSignalingAccept {
+    (invite_id: string, data: string, cb: Buffer, user_data?: string): number;
+}
+
+interface TIMSignalingReject {
+    (invite_id: string, data: string, cb: Buffer, user_data?: string): number;
+}
+interface TIMGetSignalingInfo {
+    (json_msg: string, cb: Buffer, user_data?: string): number;
+}
+
+interface TIMSignalingModifyInvitation {
+    (invite_id: string, data: string, cb: Buffer, user_data?: string): number;
+}
+
+interface TIMSetSignalingReceiveNewInvitationCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetSignalingInviteeAcceptedCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetSignalingInviteeRejectedCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetSignalingInvitationCancelledCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetSignalingInvitationTimeoutCallback {
+    (callback: Buffer, user_data?: string): void;
+}
+interface TIMSetSignalingInvitationModifiedCallback {
+    (callback: Buffer, user_data?: string): void;
+}
 interface libMethods {
     // timbase start
     TIMInit: TIMInitFun;
@@ -622,12 +844,21 @@ interface libMethods {
     callExperimentalAPI: callExperimentalAPIFun;
     TIMProfileGetUserProfileList: TIMProfileGetUserProfileListFun;
     TIMProfileModifySelfUserProfile: TIMProfileModifySelfUserProfileFun;
+    TIMSetSelfInfoUpdatedCallback: TIMSetSelfInfoUpdatedCallback;
+    TIMSetUserStatusChangedCallback: TIMSetUserStatusChangedCallback;
+    TIMGetUserStatus: TIMGetUserStatus;
+    TIMSetSelfStatus: TIMSetSelfStatus;
+    TIMSubscribeUserStatus: TIMSubscribeUserStatus;
+    TIMUnsubscribeUserStatus: TIMUnsubscribeUserStatus;
+    TIMSetUserInfoChangedCallback: TIMSetUserInfoChangedCallback;
+    TIMSubscribeUserInfo: TIMSubscribeUserInfo;
     // timbase end
 
     // conversation start
     TIMConvCreate: TIMConvCreateFun;
     TIMConvGetConvList: TIMConvGetConvListFun;
     TIMConvDelete: TIMConvDeleteFun;
+    TIMConvDeleteConversationList: TIMConvDeleteConversationList;
     TIMConvSetDraft: TIMConvSetDraftFun;
     TIMConvCancelDraft: TIMConvCancelDraftFun;
     TIMConvGetConvInfo: TIMConvGetConvInfoFun;
@@ -635,6 +866,13 @@ interface libMethods {
     TIMConvGetTotalUnreadMessageCount: TIMConvGetTotalUnreadMessageCountFun;
     TIMSetConvEventCallback: TIMSetConvEventCallbackFun;
     TIMSetConvTotalUnreadMessageCountChangedCallback: TIMSetConvTotalUnreadMessageCountChangedCallbackFun;
+    TIMConvGetUnreadMessageCountByFilter: TIMConvGetUnreadMessageCountByFilter;
+    TIMConvSubscribeUnreadMessageCountByFilter: TIMConvSubscribeUnreadMessageCountByFilter;
+    TIMConvUnsubscribeUnreadMessageCountByFilter: TIMConvUnsubscribeUnreadMessageCountByFilter;
+    TIMConvCleanConversationUnreadMessageCount: TIMConvCleanConversationUnreadMessageCount;
+    TIMGroupIncreaseGroupCounter: TIMGroupIncreaseGroupCounter;
+    TIMGroupDecreaseGroupCounter: TIMGroupDecreaseGroupCounter;
+    TIMSetConvUnreadMessageCountChangedByFilterCallback: TIMSetConvUnreadMessageCountChangedByFilterCallback;
     TIMConvGetConversationListByFilter: TIMConvGetConversationListByFilter;
     TIMConvMarkConversation: TIMConvMarkConversation;
     TIMConvCreateConversationGroup: TIMConvCreateConversationGroup;
@@ -701,6 +939,8 @@ interface libMethods {
     TIMSetFriendBlackListAddedCallback: TIMSetFriendBlackListAddedCallbackFun;
     TIMSetFriendBlackListDeletedCallback: TIMSetFriendBlackListDeletedCallbackFun;
     TIMSetMsgUpdateCallback: TIMSetMsgUpdateCallbackFun;
+    TIMMsgTranslateText: TIMMsgTranslateText;
+    TIMMsgConvertVoiceToText: TIMMsgConvertVoiceToText;
     // friendship end
 
     // group start
@@ -722,6 +962,8 @@ interface libMethods {
     TIMGroupReportPendencyReaded: TIMGroupReportPendencyReadedFun;
     TIMGroupHandlePendency: TIMGroupHandlePendencyFun;
     TIMGroupGetOnlineMemberCount: TIMGroupGetOnlineMemberCountFun;
+    TIMGroupSetGroupCounters: TIMGroupSetGroupCounters;
+    TIMGroupGetGroupCounters: TIMGroupGetGroupCounters;
     TIMGroupSearchGroups: TIMGroupSearchGroupsFun;
     TIMGroupSearchGroupMembers: TIMGroupSearchGroupMembersFun;
     TIMGroupInitGroupAttributes: TIMGroupInitGroupAttributesFun;
@@ -730,10 +972,38 @@ interface libMethods {
     TIMGroupGetGroupAttributes: TIMGroupGetGroupAttributesFun;
     TIMSetGroupTipsEventCallback: TIMSetGroupTipsEventCallbackFun;
     TIMSetGroupAttributeChangedCallback: TIMSetGroupAttributeChangedCallbackFun;
+    TIMSetGroupCounterChangedCallback: TIMSetGroupCounterChangedCallback;
+    TIMSetGroupTopicCreatedCallback: TIMSetGroupTopicCreatedCallback;
+    TIMSetGroupTopicDeletedCallback: TIMSetGroupTopicDeletedCallback;
+    TIMSetGroupTopicChangedCallback: TIMSetGroupTopicChangedCallback;
     TIMSetMsgExtensionsChangedCallback: TIMSetUpdateFriendProfileCallbackFun;
     TIMSetMsgExtensionsDeletedCallback: TIMSetUpdateFriendProfileCallbackFun;
+    TIMSetConvConversationGroupCreatedCallback: TIMSetConvConversationGroupCreatedCallback;
+    TIMSetConvConversationGroupDeletedCallback: TIMSetConvConversationGroupDeletedCallback;
+    TIMSetConvConversationGroupNameChangedCallback: TIMSetConvConversationGroupNameChangedCallback;
+    TIMSetConvConversationsAddedToGroupCallback: TIMSetConvConversationsAddedToGroupCallback;
+    TIMSetConvConversationsDeletedFromGroupCallback: TIMSetConvConversationsDeletedFromGroupCallback;
+    TIMGroupGetJoinedCommunityList: TIMGroupGetJoinedCommunityList;
+    TIMGroupCreateTopicInCommunity: TIMGroupCreateTopicInCommunity;
+    TIMGroupDeleteTopicFromCommunity: TIMGroupDeleteTopicFromCommunity;
+    TIMGroupSetTopicInfo: TIMGroupSetTopicInfo;
+    TIMGroupGetTopicInfoList: TIMGroupGetTopicInfoList;
     // group end
     TIMMsgSetOfflinePushToken: TIMMsgSetOfflinePushToken;
+    // signaling
+    TIMSignalingInvite: TIMSignalingInvite;
+    TIMSignalingInviteInGroup: TIMSignalingInviteInGroup;
+    TIMSignalingCancel: TIMSignalingCancel;
+    TIMSignalingAccept: TIMSignalingAccept;
+    TIMSignalingReject: TIMSignalingReject;
+    TIMGetSignalingInfo: TIMGetSignalingInfo;
+    TIMSignalingModifyInvitation: TIMSignalingModifyInvitation;
+    TIMSetSignalingReceiveNewInvitationCallback: TIMSetSignalingReceiveNewInvitationCallback;
+    TIMSetSignalingInviteeAcceptedCallback: TIMSetSignalingInviteeAcceptedCallback;
+    TIMSetSignalingInviteeRejectedCallback: TIMSetSignalingInviteeRejectedCallback;
+    TIMSetSignalingInvitationCancelledCallback: TIMSetSignalingInvitationCancelledCallback;
+    TIMSetSignalingInvitationTimeoutCallback: TIMSetSignalingInvitationTimeoutCallback;
+    TIMSetSignalingInvitationModifiedCallback: TIMSetSignalingInvitationModifiedCallback;
 }
 
 export { libMethods };

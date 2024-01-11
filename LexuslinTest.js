@@ -88,10 +88,10 @@ class LexuslinTest {
     // 1
     TIMFriendshipHandleFriendAddRequest() {
         return this.friendshipManager.TIMFriendshipHandleFriendAddRequest({
-            friend_respone_identifier: "lexuslin3",
-            friend_respone_action: 1,
-            friend_respone_remark: "xx",
-            friend_respone_group_name: "xx",
+            friend_response_identifier: "lexuslin3",
+            friend_response_action: 1,
+            friend_response_remark: "xx",
+            friend_response_group_name: "xx",
         }, "user data")
     }
     // 1
@@ -284,7 +284,7 @@ class LexuslinTest {
     TIMMsgDelete() {
         return this.advanceMessageManager.TIMMsgDelete("lexuslin3", 1, {
             msg_delete_param_msg: "144115231469886159-1624848680-2873600283",
-            msg_delete_param_is_remble: true
+            msg_delete_param_is_ramble: true
         }, "user data")
     }
     // 0, error, code -3
@@ -314,9 +314,7 @@ class LexuslinTest {
         return this.advanceMessageManager.TIMMsgDownloadElemToPath({
             msg_download_elem_param_flag: 2,
             msg_download_elem_param_type: 2,
-            // msg_download_elem_param_id: "1400187352_lexuslin3_c3b94cee5c318b590b5cff79a712af23.MOV",
-            // msg_download_elem_param_business_id: 0,
-            msg_download_elem_param_url: "https://cos.ap-shanghai.myqcloud.com/0345-1400187352-1303031839/b310-lexuslin3/c3b94cee5c318b590b5cff79a712af23.MOV",
+            msg_download_elem_param_url: "",
         }, "/home/lexuslin/Downloads/111.mov", "user data")
     }
     TIMMsgDownloadMergerMessage() {
