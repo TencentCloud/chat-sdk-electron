@@ -24,7 +24,13 @@ const APIS = [
             {
                 name: "callExperimentalAPI",
                 action: (callback) => {
-                    TimBaseManager.callExperimentalAPI()
+
+
+                    TimBaseManager.callExperimentalAPI().then((...args)=>{
+                        callback(JSON.stringify(args))
+                    }).catch((err)=>{
+                        callback(err.toString())
+                    })
                     // .then(data=>{
                     //     callback(JSON.stringify(data))
                     // }).catch(err=>{
@@ -76,13 +82,13 @@ const APIS = [
             {
                 name: "TIMInviteInGroup",
                 action: (callback) => {
-                    // TimBaseManager.TIMInviteInGroup().then(data => {
-                    //     console.log(data,113212)
-                    //     callback(JSON.stringify(data))
-                    // }).catch(err => {
-                    //     console.log(err)
-                    //     callback(err.toString())
-                    // })
+                    TimBaseManager.TIMInviteInGroup().then(data => {
+                        console.log(data,113212)
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        console.log(err)
+                        callback(err.toString())
+                    })
                 }
             },
             {
@@ -738,7 +744,7 @@ const APIS = [
                         if(data.json_param!=null){
                             const d = data.json_param
                         //  seq = JSON.parse(data.data.json_param).group_get_memeber_info_list_result_next_seq
-    
+                            console.log(data);
                         // seq = d;
                         // console.log('本次获取数据',d.group_get_memeber_info_list_result_info_array.map((item)=>{ console.log(item.group_member_info_identifier);return item; }));
                         }  
@@ -1506,6 +1512,26 @@ const APIS = [
                 name: 'TIMMsgSearchLocalMessages',
                 action: (callback) => {
                     TimAdvanceMessageManager.TIMMsgSearchLocalMessages().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: 'TIMMsgSearchCloudMessages',
+                action: (callback) => {
+                    TimAdvanceMessageManager.TIMMsgSearchCloudMessages().then(data => {
+                        callback(JSON.stringify(data))
+                    }).catch(err => {
+                        callback(err.toString())
+                    })
+                }
+            },
+            {
+                name: 'TIMMsgSetLocalCustomData',
+                action: (callback) => {
+                    TimAdvanceMessageManager.TIMMsgSetLocalCustomData().then(data => {
                         callback(JSON.stringify(data))
                     }).catch(err => {
                         callback(err.toString())

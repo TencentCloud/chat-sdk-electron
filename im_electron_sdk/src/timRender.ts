@@ -210,6 +210,7 @@ import {
     TranslateTextParam,
     ConvertVoiceToTextParam,
     MessageTranslateTextResult,
+    SetLocalCustomDataParam,
 } from "./interface";
 import { ipcData, Managers } from "./interface/ipcInterface";
 import { ipcRenderer } from "electron";
@@ -236,6 +237,7 @@ export default class TimRender {
         new Array();
     static _downloadCallbackArray: Array<TIMMsgDownloadElemToPathFunc> =
         new Array();
+    static _downloadCallbacks: Map<string, Function> = new Map();
     constructor() {
         if (!TimRender.isListened) {
             ipcRenderer.on(`global-callback-reply`, (e: any, res: any) => {
@@ -909,6 +911,7 @@ export default class TimRender {
                 null as unknown as TIMConvConversationGroupCreatedCallback,
             user_data: "",
         });
+
         await this.TIMSetKickedOfflineCallback({
             callback: null as unknown as TIMSetKickedOfflineCallback,
             userData: "",
@@ -2043,7 +2046,26 @@ export default class TimRender {
 
         return this._call<commonResult<MessageSearchResult>>(formatedData);
     }
+    TIMMsgSearchCloudMessages(
+        msgSearchLocalMessagesParams: MsgSearchLocalMessagesParams
+    ) {
+        const formatedData = {
+            method: "TIMMsgSearchCloudMessages",
+            manager: Managers.advanceMessageManager,
+            param: msgSearchLocalMessagesParams,
+        };
 
+        return this._call<commonResult<MessageSearchResult>>(formatedData);
+    }
+    TIMMsgSetLocalCustomData(param: SetLocalCustomDataParam) {
+        const formatedData = {
+            method: "TIMMsgSetLocalCustomData",
+            manager: Managers.advanceMessageManager,
+            param: param,
+        };
+
+        return this._call<commonResult<string>>(formatedData);
+    }
     TIMMsgSetMessageExtensions(
         msgSetMessageExtensionsParam: TIMMsgSetMessageExtensionsParam
     ) {
@@ -2115,10 +2137,20 @@ export default class TimRender {
         }
     }
     downloadCallback(data: [0, "", "", ""]) {
-        for (let i = 0; i < TimRender._downloadCallbackArray.length; i++) {
-            let callback: Function = TimRender._downloadCallbackArray[i];
-            const [code, desc, json_param, user_data] = data;
+        // for (let i = 0; i < TimRender._downloadCallbackArray.length; i++) {
+        //     let callback: Function = TimRender._downloadCallbackArray[i];
+        //     const [code, desc, json_param, user_data] = data;
+        //     callback(code, desc, json_param, user_data);
+        // }
+        const [code, desc, json_param, user_data] = data;
+        const callback = TimRender._downloadCallbacks.has(user_data)
+            ? TimRender._downloadCallbacks.get(user_data)
+            : undefined;
+        if (callback != undefined) {
             callback(code, desc, json_param, user_data);
+            if ((desc as string) != "downloading") {
+                TimRender._downloadCallbacks.delete(user_data);
+            }
         }
     }
     TIMAddRecvNewMsgCallback(params: TIMRecvNewMsgCallbackParams) {
@@ -2142,7 +2174,11 @@ export default class TimRender {
     TIMMsgDownloadElemToPath(
         msgDownloadElemToPathParams: MsgDownloadElemToPathParams
     ) {
-        TimRender._downloadCallbackArray.push(
+        // TimRender._downloadCallbackArray.push(
+        //     msgDownloadElemToPathParams.callback
+        // );
+        TimRender._downloadCallbacks.set(
+            msgDownloadElemToPathParams.user_data,
             msgDownloadElemToPathParams.callback
         );
         const callback = `TIMMsgDownloadElemToPath`; // 允许多次调用，所以这里加一个随机数
@@ -2187,15 +2223,28 @@ export default class TimRender {
             this._setCallback(callback, this.recvNewMsgCallback);
             return this._call<void>(formatedData);
         } else {
+            TimRender._recvNewMsgCallbackArray = [];
+            let callbackparam: TIMRecvNewMsgCallbackParams = {
+                callback: this.recvNewMsgCallback,
+            };
             const formatedData = {
-                method: "TIMRemoveRecvNewMsgCallback",
+                method: "TIMAddRecvNewMsgCallback",
                 manager: Managers.advanceMessageManager,
                 callback,
                 windowID: this._currentWindowID,
-                param: params,
+                param: callbackparam,
             };
-
+            this._setCallback(callback, this.recvNewMsgCallback);
             return this._call<void>(formatedData);
+            // const formatedData = {
+            //     method: "TIMRemoveRecvNewMsgCallback",
+            //     manager: Managers.advanceMessageManager,
+            //     callback,
+            //     windowID: this._currentWindowID,
+            //     param: params,
+            // };
+
+            // return this._call<void>(formatedData);
         }
     }
 

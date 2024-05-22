@@ -1231,7 +1231,7 @@ class GroupManager {
                     DataType.String,
                 ],
                 paramsValue: [
-                    searchGroupsParams.searchParams,
+                    JSON.stringify(searchGroupsParams.searchParams),
                     (...args: any) => {
                         const [code, desc, json_param, user_data] = args;
                         if (code == 0) {
@@ -1292,7 +1292,7 @@ class GroupManager {
                     DataType.String,
                 ],
                 paramsValue: [
-                    searchMemberParams.searchParams,
+                    JSON.stringify(searchMemberParams.searchParams),
                     (...args: any) => {
                         const [code, desc, json_param, user_data] = args;
                         if (code == 0) {

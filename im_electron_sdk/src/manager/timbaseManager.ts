@@ -424,12 +424,7 @@ class TimbaseManager {
                 retType: DataType.Void,
                 paramsType: [
                     funcConstructor({
-                        paramsType: [
-                            DataType.I32,
-                            DataType.I32,
-                            DataType.String,
-                            DataType.String,
-                        ],
+                        paramsType: [DataType.String],
                         permanent: true,
                     }),
                     DataType.String,
@@ -634,12 +629,13 @@ class TimbaseManager {
         param: callExperimentalAPIParam
     ): Promise<commonResult<string>> {
         return new Promise((resolve, reject) => {
+            let timer: any = null;
             const code = load({
                 library: libName,
                 funcName: "callExperimentalAPI",
                 retType: DataType.I32,
                 paramsType: [
-                    DataType.I32,
+                    DataType.String,
                     funcConstructor({
                         paramsType: [
                             DataType.I32,
@@ -654,6 +650,7 @@ class TimbaseManager {
                 paramsValue: [
                     JSON.stringify(param.json_param),
                     (...args: any) => {
+                        clearTimeout(timer);
                         const [code, desc, json_param, user_data] = args;
                         if (code == 0) {
                             resolve({ code, desc, json_param, user_data });
@@ -661,10 +658,13 @@ class TimbaseManager {
                             reject({ code, desc, json_param, user_data });
                         }
                     },
-                    param.user_data,
+                    param.user_data ?? "",
                 ],
             });
             code !== 0 && reject({ code });
+            timer = setTimeout(() => {
+                resolve({ code });
+            }, 500);
         });
     }
     /**

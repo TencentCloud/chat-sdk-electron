@@ -2,9 +2,9 @@
 const { app, BrowserWindow, ipcMain, dialog, crashReporter } = require('electron')
 const path = require('path')
 const TimMain = require('./im_electron_sdk/dist/main');
+const url = require("url")
 // const TimMain = require('im_electron_sdk/dist/main');
 // const TIM = require('./im_electron_sdk/dist/tim')
-const url = require("url")
 const mainInstance = new TimMain({
   sdkappid: 0
 })
@@ -29,15 +29,15 @@ function createWindow() {
   })
   mainInstance.enable(mainWindow.webContents);
   // and load the index.html of the app.
-  mainWindow.loadURL(
-    url.format({
-      pathname: path.join(__dirname, './client/build/index.html'),
-      protocol: 'file:',
-      slashes: true
-    })
-  )
+  // mainWindow.loadURL(
+  //   url.format({
+  //     pathname: path.join(__dirname, './client/build/index.html'),
+  //     protocol: 'file:',
+  //     slashes: true
+  //   })
+  // )
 
-  // mainWindow.loadURL('http://localhost:3000')
+  mainWindow.loadURL('http://localhost:3000')
 
   // mainWindow.loadFile(path.resolve(__dirname,'./test.html'))
 
@@ -48,7 +48,7 @@ function createWindow() {
     // t.getTimbaseManager().TIMInit()
     // t.getTimbaseManager().TIMLogin({
     //   userID: "3708",
-    //   userSig: "eJyrVgrxCdYrSy1SslIy0jNQ0gHzM1NS80oy0zLBwsbmBhZQ8eKU7MSCgswUJStDEwMDQwtzY1MjiExqRUFmUSpQ3NTU1MjAwAAiWpKZCxIzMzKxNDU3NjGDmpKZDjQ2LKnAz6Q0J9s3LdQsSrvA28kvKinY1LvIOdE9yDk13DEp0SIi2zWtND*53FapFgB-kjCC",
+    //   userSig: "",
     //   userData: "xingchenhe-test",
     // }).then((data)=>{
     //   setTimeout(()=>{

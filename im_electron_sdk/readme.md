@@ -16,7 +16,7 @@ Explore more docs about [Tencent Cloud Chat](https://www.tencentcloud.com/en/pro
 ## Commonly Used Scenarios
 - Online Customer Service
   
-  <img src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/L7Q6912_%E5%9C%A8%E7%BA%BF%E5%AE%A2%E6%9C%8D%402x.jpg" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/L7Q6912_%E5%9C%A8%E7%BA%BF%E5%AE%A2%E6%9C%8D%402x.jpg" style="max-width: 100%;">
+  <img src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/L7Q6912_%E5%9C%A8%E7%BA%BF%E5%AE%A2%E6%9C%8D%402x.jpg"" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/L7Q6912_%E5%9C%A8%E7%BA%BF%E5%AE%A2%E6%9C%8D%402x.jpg" style="max-width: 100%;">
 
 - OA
   
@@ -36,16 +36,16 @@ Explore more docs about [Tencent Cloud Chat](https://www.tencentcloud.com/en/pro
   <img src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/XubI769_%E4%BA%92%E5%8A%A8%E6%B8%B8%E6%88%8F%402x.jpg" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/XubI769_%E4%BA%92%E5%8A%A8%E6%B8%B8%E6%88%8F%402x.jpg" style="max-width: 100%;">
 - Online Education
   
-  <img src="https://camo.githubusercontent.com/0b154201b11573c4959dd3242a3861ef5bac789d4097ff9b67b604b04bd86027/68747470733a2f2f636c6f756463616368652e696e746c2e74656e63656e742d636c6f75642e636f6d2f636d732f6261636b656e642d636d732f646b495a3831335f25453525394325413825453725424125424625453625393525393925453825383225423225343032782e6a7067" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/dkIZ813_%E5%9C%A8%E7%BA%BF%E6%95%99%E8%82%B2%402x.jpg" style="max-width: 100%;">
+  <img src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/dkIZ813_%E5%9C%A8%E7%BA%BF%E6%95%99%E8%82%B2%402x.jpg" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/dkIZ813_%E5%9C%A8%E7%BA%BF%E6%95%99%E8%82%B2%402x.jpg" style="max-width: 100%;">
 - Online Healthcare
   
-  <img src="https://camo.githubusercontent.com/e4ee25eeee9e85f8d01db85c007dde82796946f08f86942fc7dcc65a745f49bf/68747470733a2f2f636c6f756463616368652e696e746c2e74656e63656e742d636c6f75642e636f6d2f636d732f6261636b656e642d636d732f373744733936355f25453525394325413825453725424125424625453525384325424225453725393625393725343032782e6a7067" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/77Ds965_%E5%9C%A8%E7%BA%BF%E5%8C%BB%E7%96%97%402x.jpg" style="max-width: 100%;">
+  <img src="https://staticintl.cloudcachetci.com/cms/backend-cms/bPBT098_%E8%92%99%E7%89%883.png" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/77Ds965_%E5%9C%A8%E7%BA%BF%E5%8C%BB%E7%96%97%402x.jpg" style="max-width: 100%;">
 - Meeting
   
-  <img src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/24ZF778_%E5%9C%A8%E7%BA%BF%E4%BC%9A%E8%AE%AE%402x.jpg" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/24ZF778_%E5%9C%A8%E7%BA%BF%E4%BC%9A%E8%AE%AE%402x.jpg" style="max-width: 100%;">
+  <img src="https://staticintl.cloudcachetci.com/cms/backend-cms/EAEG299_%E8%92%99%E7%89%883.png" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/24ZF778_%E5%9C%A8%E7%BA%BF%E4%BC%9A%E8%AE%AE%402x.jpg" style="max-width: 100%;">
 - Smart Device
   
-  <img src="https://camo.githubusercontent.com/5bbf685aae18cffa29cbc4be90752908e3451f7e8337abfccca75409dc95efa8/68747470733a2f2f636c6f756463616368652e696e746c2e74656e63656e742d636c6f75642e636f6d2f636d732f6261636b656e642d636d732f794d52633933365f2545362539392542412545382538332542442545382541452542452545352541342538372534303278253230253238312532392e6a7067" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/yMRc936_%E6%99%BA%E8%83%BD%E8%AE%BE%E5%A4%87%402x%20%281%29.jpg" style="max-width: 100%;">
+  <img src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/yMRc936_%E6%99%BA%E8%83%BD%E8%AE%BE%E5%A4%87%402x%20%281%29.jpg" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/yMRc936_%E6%99%BA%E8%83%BD%E8%AE%BE%E5%A4%87%402x%20%281%29.jpg" style="max-width: 100%;">
 - Private Cloud Deployment
   
   <img src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/aL7m811_%E7%A7%81%E6%9C%89%E5%8C%96%E9%83%A8%E7%BD%B2%402x.jpg" width="730" height="410" data-canonical-src="https://cloudcache.intl.tencent-cloud.com/cms/backend-cms/aL7m811_%E7%A7%81%E6%9C%89%E5%8C%96%E9%83%A8%E7%BD%B2%402x.jpg" style="max-width: 100%;">

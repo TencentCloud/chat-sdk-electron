@@ -5,6 +5,7 @@ import {
     TIMGroupAtType,
     TIMGroupMemberRole,
     TIMGroupModifyInfoFlag,
+    TIMGroupTipGroupChangeFlag,
     TIMGroupType,
     TIMReceiveMessageOpt,
 } from "../enum";
@@ -809,6 +810,37 @@ interface GroupTopicInfoResult {
     group_topic_info_result_topic_info: GroupTopicInfo;
 }
 
+/**
+ * @brief 群组系统消息-群组信息修改
+ * @param group_tips_group_change_info_flag 只读, 群消息修改群信息标志 [TIMGroupTipGroupChangeFlag]
+ * @param group_tips_group_change_info_value  只读, 修改的后值,不同的 info_flag 字段,具有不同的含义
+ * @param group_tips_group_change_info_key 只读, 自定义信息对应的 key 值，只有 info_flag 为 kTIMGroupTipChangeFlag_Custom 时有效
+ * @param group_tips_group_change_info_bool_value 只读, 根据变更类型表示不同的值，当前只有 info_flag 为 kTIMGroupTipChangeFlag_ShutupAll 时有效
+ * @param group_tips_group_change_info_int_value 只读，根据变更类型表示不同的值
+ * note 仅针对以下类型有效：
+//  - 从 6.5 版本开始，当 info_flag 为 kTIMGroupTipChangeFlag_MessageReceiveOpt 时，该字段标识了群消息接收选项发生了变化，其取值详见 [TIMReceiveMessageOpt](TIMCloudComm.h)
+//  - 从 6.5 版本开始，当 info_flag 为 kTIMGroupTipChangeFlag_GroupAddOpt 时，该字段标识了申请加群审批选项发生了变化，其取值详见 [TIMGroupAddOption]()
+//  - 从 7.1 版本开始，当 info_flag 为 kTIMGroupTipChangeFlag_GroupApproveOpt 时，该字段标识了邀请进群审批选项发生了变化，取值类型详见 [TIMGroupAddOption]()
+ */
+interface GroupTipGroupChangeInfo {
+    group_tips_group_change_info_flag: TIMGroupTipGroupChangeFlag;
+    group_tips_group_change_info_value: string;
+    group_tips_group_change_info_key: string;
+    group_tips_group_change_info_bool_value: boolean;
+    group_tips_group_change_info_int_value: number;
+}
+
+/**
+ * @param group_tips_member_mark_change_info_enableMark 只读, 群成员被标记或取消标记
+ * @param group_tips_member_mark_change_info_markType 只读, 标记类型
+ * @param group_tips_member_mark_change_info_userIDList 只读, 群成员 userID 列表
+ */
+
+interface GroupTipMemberChangeInfo {
+    group_tips_member_mark_change_info_enableMark: boolean;
+    group_tips_member_mark_change_info_markType: number;
+    group_tips_member_mark_change_info_userIDList: string;
+}
 export {
     GroupBaseInfo,
     GroupDetailInfo,
@@ -875,4 +907,6 @@ export {
     TIMGroupTopicDeletedCallback,
     TopicChangedParam,
     TIMGroupTopicChangedCallback,
+    GroupTipGroupChangeInfo,
+    GroupTipMemberChangeInfo,
 };

@@ -1,35 +1,72 @@
 // import { TIMConvType, TIMDownloadType, TIMElemType, TIMReceiveMessageOpt } from "../../../im_electron_sdk/dist/enums";
 import TimRender from "../../../im_electron_sdk/dist/renderer";
-import { ConvertVoiceToTextParam, Json_value_msg, MsgBatchSendParams, MsgCancelSendParams, MsgClearHistoryMessageParams, MsgDeleteParams, MsgDownloadElemToPathParams, MsgDownloadMergerMessageParams, MsgFindByMsgLocatorListParams, MsgFindMessagesParams, MsgGetC2CReceiveMessageOptParams, MsgGetMsgListParams, MsgImportMsgListParams, MsgListDeleteParams, MsgModifyMessageParams, MsgReportReadedParams, MsgRevokeParams, MsgSaveMsgParams, MsgSearchLocalMessagesParams, MsgSendMessageParamsV2, MsgSendReplyMessage, MsgSetC2CReceiveMessageOptParams, MsgSetGroupReceiveMessageOptParams, OfflinePushToken, TIMMsgDeleteMessageExtensionsParam, TIMMsgElemUploadProgressCallbackParams, TIMMsgGetMessageExtensionsParam, TIMMsgReadedReceiptCallbackParams, TIMMsgRevokeCallbackParams, TIMMsgSetMessageExtensionsParam, TIMMsgUpdateCallbackParams, TIMRecvNewMsgCallbackParams, TIMSetMsgExtensionsChangedCallbackParam, TIMSetMsgExtensionsDeletedCallbackParam, TranslateTextParam } from "../../../im_electron_sdk/dist/interfaces";
+import { ConvertVoiceToTextParam, Json_value_msg, MsgBatchSendParams, MsgCancelSendParams, MsgClearHistoryMessageParams, MsgDeleteParams, MsgDownloadElemToPathParams, MsgDownloadMergerMessageParams, MsgFindByMsgLocatorListParams, MsgFindMessagesParams, MsgGetC2CReceiveMessageOptParams, MsgGetMsgListParams, MsgImportMsgListParams, MsgListDeleteParams, MsgModifyMessageParams, MsgReportReadedParams, MsgRevokeParams, MsgSaveMsgParams, MsgSearchLocalMessagesParams, MsgSendMessageParamsV2, MsgSendReplyMessage, MsgSetC2CReceiveMessageOptParams, MsgSetGroupReceiveMessageOptParams, OfflinePushToken, SetLocalCustomDataParam, TIMMsgDeleteMessageExtensionsParam, TIMMsgElemUploadProgressCallbackParams, TIMMsgGetMessageExtensionsParam, TIMMsgReadedReceiptCallbackParams, TIMMsgRevokeCallbackParams, TIMMsgSetMessageExtensionsParam, TIMMsgUpdateCallbackParams, TIMRecvNewMsgCallbackParams, TIMSetMsgExtensionsChangedCallbackParam, TIMSetMsgExtensionsDeletedCallbackParam, TranslateTextParam } from "../../../im_electron_sdk/dist/interfaces";
 
 
 // import TimRender from "im_electron_sdk/dist/renderer";
 const timRenderInstance = new TimRender();
 let json_msg_param:Json_value_msg = {}
 let total = 0;
+function _sendMessage(text:string,convId:string){
+    console.log(total);
+    if(total == 10000){
+        return;
+    }
+    timRenderInstance.TIMMsgSendMessage({
+        conv_id: convId,
+        conv_type: 1,
+        params:{
+            message_elem_array: [{
+                elem_type: 0,
+                text_elem_content:text,
+            }],
+        }
+    }).then(data => {
+        var text = `${Date.now()}-${++total}`;
+        _sendMessage(text,convId);
+    }).catch(err => {
+        var text = `${Date.now()}-${++total}`;
+        _sendMessage(text,convId);
+    })
+}
 const advanceMessageManager = {
-    
+
     TIMMsgSendMessage:() => {
+        let message = {
+            "json_msg_array": "[{\"message_client_time\":1712567719,\"message_cloud_custom_str\":\"{\\\"data\\\":\\\"{}\\\"}\",\"message_conv_id\":\"@TGS#1G4QXDSOBN\",\"message_conv_type\":2,\"message_custom_int\":0,\"message_custom_str\":\"{\\\"type\\\":7,\\\"data\\\":\\\"{\\\\\\\"translateData\\\\\\\":{\\\\\\\"showTranslate\\\\\\\":true,\\\\\\\"translateState\\\\\\\":2,\\\\\\\"translateType\\\\\\\":0,\\\\\\\"languageType\\\\\\\":\\\\\\\"en\\\\\\\",\\\\\\\"translate\\\\\\\":\\\\\\\"6\\\\\\\"}}\\\"}\",\"message_elem_array\":[{\"elem_type\":0,\"text_elem_content\":\"6\"}],\"message_excluded_from_content_moderation\":false,\"message_excluded_from_last_message\":false,\"message_group_receipt_read_count\":0,\"message_group_receipt_unread_count\":-1,\"message_has_sent_receipt\":true,\"message_is_broadcast_message\":false,\"message_is_excluded_from_unread_count\":false,\"message_is_from_self\":false,\"message_is_online_msg\":false,\"message_is_peer_read\":true,\"message_is_read\":true,\"message_msg_id\":\"115766-1712567719-2020214306\",\"message_need_read_receipt\":true,\"message_offline_push_config\":{\"offline_push_config_android_config\":{\"android_offline_push_config_fcm_channel_id\":\"\",\"android_offline_push_config_huawei_category\":\"\",\"android_offline_push_config_notify_mode\":0,\"android_offline_push_config_oppo_channel_id\":\"\",\"android_offline_push_config_sound\":\"\",\"android_offline_push_config_title\":\"\",\"android_offline_push_config_vivo_category\":\"\",\"android_offline_push_config_vivo_classification\":1,\"android_offline_push_config_xiaomi_channel_id\":\"\"},\"offline_push_config_desc\":\"@it003: 6666\",\"offline_push_config_ext\":\"{\\\"type\\\":\\\"im_chat\\\",\\\"info\\\":{\\\"groupId\\\":\\\"@TGS#1G4QXDSOBN\\\"},\\\"deepLink\\\":\\\"phospherus://client/page/message/moveToChat?toAppTabId=6&groupId=%40TGS%231G4QXDSOBN\\\"}\",\"offline_push_config_flag\":0,\"offline_push_config_ios_config\":{\"ios_offline_push_config_ignore_badge\":false,\"ios_offline_push_config_push_type\":0,\"ios_offline_push_config_sound\":\"\",\"ios_offline_push_config_title\":\"\"}},\"message_platform\":0,\"message_priority\":1,\"message_rand\":2020214306,\"message_receipt_peer_read\":false,\"message_revoker_user_id\":\"\",\"message_sender\":\"7c7e7040589d4d3896c2fa3791b6e8cc\",\"message_sender_group_member_info\":{\"group_member_info_custom_info\":[],\"group_member_info_face_url\":\"\",\"group_member_info_friend_remark\":\"\",\"group_member_info_group_id\":\"\",\"group_member_info_identifier\":\"7c7e7040589d4d3896c2fa3791b6e8cc\",\"group_member_info_join_time\":0,\"group_member_info_member_role\":200,\"group_member_info_msg_flag\":0,\"group_member_info_msg_seq\":0,\"group_member_info_name_card\":\"\",\"group_member_info_nick_name\":\"\",\"group_member_info_shutup_time\":0},\"message_sender_profile\":{\"user_profile_face_url\":\"https://superappdev.oss-cn-hangzhou.aliyuncs.com/im/c37b926e0677421f8a4c85c858002b32\",\"user_profile_friend_remark\":\"\",\"user_profile_identifier\":\"7c7e7040589d4d3896c2fa3791b6e8cc\",\"user_profile_nick_name\":\"000\"},\"message_seq\":325,\"message_server_time\":1712567718,\"message_status\":2,\"message_support_message_extension\":false,\"message_unique_id\":1397884585506,\"message_version\":4}]"
+        }
+        let json_message = JSON.parse(JSON.stringify(message));
+        let {message_cloud_custom_str,message_custom_str} = JSON.parse(JSON.stringify(json_message.json_msg_array));
+        console.log(message_cloud_custom_str)
+        console.log(message_custom_str)
+        let customjson = {type:7,"data":{"showTranslate":true,"translateState":2,"translateType":0,"languageType":'en',"translate":'6'}}
+        let sendMessage:Json_value_msg = {
+            message_elem_array : [{
+                elem_type:0,
+                text_elem_content:"6"
+            }],
+            message_conv_id:"@TGS#1CNQDDUML",
+            message_conv_type:2,
+            message_sender:"10058198",
+            message_priority:1,
+            message_need_read_receipt:true,
+            message_platform:json_message.json_msg_array.message_platform,
+            message_cloud_custom_str:"{data:{}}",
+            message_custom_int:1,
+            message_custom_str:JSON.stringify(JSON.stringify(JSON.stringify(customjson))),
+            message_excluded_from_content_moderation:false,
+            message_excluded_from_last_message:false,
+            
+        }
+        console.log(json_message);
+        console.log(sendMessage);
         let param:MsgSendMessageParamsV2 = {
-            conv_id: "",
-            conv_type: 1,
-            params: {
-                // @ts-ignore
-                message_elem_array: [{
-                    elem_type: 0,
-                    // image_elem_orig_path: "/Users/dasiychoi/Desktop/11.png",
-                    // text_elem_content: `\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008\u0009\u000a\u000b\u000c\u000d\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f\u0020\u0021\u0022\u0023\u0024\u0025\u0026\u0027\u0028\u0029\u002a\u002b\u002c\u002d\u002e\u002f\u0030\u0031\u0032\u0033\u0034\u0035\u0036\u0037\u0038\u0039\u003a\u003b\u003c\u003d\u003e\u003f\u0040\u0041\u0042\u0043\u0044\u0045\u0046\u0047\u0048\u0049\u004a\u004b\u004c\u004d\u004e\u004f\u0050\u0051\u0052\u0053\u0054\u0055\u0056\u0057\u0058\u0059\u005a\u005b\u005c\u005d\u005e\u005f\u0060\u0061\u0062\u0063\u0064\u0065\u0066\u0067\u0068\u0069\u006a\u006b\u006c\u006d\u006e\u006f\u0070\u0071\u0072\u0073\u0074\u0075\u0076\u0077\u0078\u0079\u007a\u007b\u007c\u007d\u007e\u007f\u0080\u0081\u0082\u0083\u0084\u0085\u0086\u0087\u0088\u0089\u008a\u008b\u008c\u008d\u008e\u008f\u0090\u0091\u0092\u0093\u0094\u0095\u0096\u0097\u0098\u0099\u009a\u009b\u009c\u009d\u009e\u009f\u00a0\u00a1\u00a2\u00a3\u00a4\u00a5\u00a6\u00a7\u00a8\u00a9\u00aa\u00ab\u00ac\u00ad\u00ae\u00af\u00b0\u00b1\u00b2\u00b3\u00b4\u00b5\u00b6\u00b7\u00b8\u00b9\u00ba\u00bb\u00bc\u00bd\u00be\u00bf\u00c0\u00c1\u00c2\u00c3\u00c4\u00c5\u00c6\u00c7\u00c8\u00c9\u00ca\u00cb\u00cc\u00cd\u00ce\u00cf\u00d0\u00d1\u00d2\u00d3\u00d4\u00d5\u00d6\u00d7\u00d8\u00d9\u00da\u00db\u00dc\u00dd\u00de\u00df\u00e0\u00e1\u00e2\u00e3\u00e4\u00e5\u00e6\u00e7\u00e8\u00e9\u00ea\u00eb\u00ec\u00ed\u00ee\u00ef\u00f0\u00f1\u00f2\u00f3\u00f4\u00f5\u00f6\u00f7\u00f8\u00f9\u00fa\u00fb\u00fc\u00fd\u00fe\u00ff`
-                    text_elem_content:'最新',
-                    // text_elem_content:`abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,./;'[]=-0987654321<>，。、‘；【】？》《：“|+——）（\n\b/n/b`
-                    // image_elem_orig_path: "/home/lexuslin/sucai/111.png",
-                    // image_elem_level: 0
-                    // file_elem_file_path: "/Users/dasiychoi/Desktop/游戏集成IM指南.md",
-                    // file_elem_file_name: "xxxx",
-                    // file_elem_file_size: 23150412 
-                }],
-                message_cloud_custom_str: "test electron sdk cloud field",
-                message_need_read_receipt:true,
-            },
+            conv_id: "@TGS#1CNQDDUML",
+            // conv_id: "daisychoi",
+            // conv_id: "3e56df7704234f83b195e6b25a5ba665",
+            // conv_id: "10058198",
+            conv_type: 2,
+            params: sendMessage,
             // user_data: "123",
             callback: (data) => {
                 // const {code, json_params, desc } = data;
@@ -51,6 +88,9 @@ const advanceMessageManager = {
             }
         }
         return timRenderInstance.TIMMsgSendMessageV2(param);
+        // _sendMessage(`start-${total}`,"daisychoi")
+        // return new Promise(()=>{});
+        
     },
     TIMMsgSendReplyMessage: () => {
         let param:MsgSendReplyMessage = {
@@ -98,7 +138,7 @@ const advanceMessageManager = {
     },
     TIMMsgFindMessages:() => {
         let param:MsgFindMessagesParams = {
-            json_message_id_array: [""],
+            json_message_id_array: ["144115355158486521-1715331802-2270131316"],
             user_data: "123"
         }
         return timRenderInstance.TIMMsgFindMessages(param);
@@ -237,19 +277,39 @@ const advanceMessageManager = {
         return timRenderInstance.TIMMsgSetGroupReceiveMessageOpt(param);
     },
     TIMMsgDownloadElemToPath:() => {
-        var id = ""; 
+        // var id = ""; 
+        // let param1:MsgFindMessagesParams = {
+        //     json_message_id_array: ["144115355158486521-1715331802-2270131316"],
+        //     user_data: "123"
+        // }
+        // timRenderInstance.TIMMsgFindMessages(param1);
         let param:MsgDownloadElemToPathParams = {
             params: {
-                msg_download_elem_param_id: id,
-                msg_download_elem_param_url: "",
+                msg_download_elem_param_flag:1,
+                msg_download_elem_param_id: "1400187352_144115355158486521_c7ac05874ff94a2447f4c363cd1135ae.pdf",
+                msg_download_elem_param_url: "https://cos.ap-shanghai.myqcloud.com/f8f0-shanghai-360-sharedv4-01-1303031839/0345-1400187352/c131-MTAwNTgxOTg/c7ac05874ff94a2447f4c363cd1135ae.pdf?im-report-marked",
                 
             },
             callback:(code:number,desc:string,json_param:string,userdata)=>{
                 console.log("下载进度",code,desc,json_param,userdata);
             },
-            path: `/Users/dasiychoi/Documents/work/${id}`,
-            user_data: "123"
+            path: `/Users/dasiychoi/Documents/work/1400187352_144115355158486521_c7ac05874ff94a2447f4c363cd1135ae.pdf`,
+            user_data: "1111111"
         }
+        let param2:MsgDownloadElemToPathParams = {
+            params: {
+                msg_download_elem_param_flag:2,
+                msg_download_elem_param_id: "1400187352_144115355158486521_fbe23c81d207d06cc442478e11f193be.mp4",
+                msg_download_elem_param_url: "https://cos.ap-shanghai.myqcloud.com/f8f0-shanghai-360-sharedv4-01-1303031839/0345-1400187352/c131-MTAwNTgxOTg/fbe23c81d207d06cc442478e11f193be.mp4?im-report-marked",
+                
+            },
+            callback:(code:number,desc:string,json_param:string,userdata)=>{
+                console.log("下载进度",code,desc,json_param,userdata);
+            },
+            path: `/Users/dasiychoi/Documents/work/1400187352_144115355158486521_fbe23c81d207d06cc442478e11f193be.mp4`,
+            user_data: "22222222"
+        }
+        timRenderInstance.TIMMsgDownloadElemToPath(param2);
         return timRenderInstance.TIMMsgDownloadElemToPath(param);
     },
     TIMMsgDownloadMergerMessage:() => {
@@ -297,11 +357,28 @@ const advanceMessageManager = {
         }
         return timRenderInstance.TIMMsgSearchLocalMessages(param);
     },
+    TIMMsgSearchCloudMessages:() => {
+        let param:MsgSearchLocalMessagesParams = {
+            params: {
+                msg_search_param_keyword_array: ["1"],
+                msg_search_param_message_type_array: [0],
+                // msg_search_param_conv_id: "10058198",
+                // msg_search_param_conv_type: 1,
+                // msg_search_param_search_time_position: 0,
+                // msg_search_param_search_time_period: 24*60*60*7,
+                // msg_search_param_page_index: 0,
+                // msg_search_param_page_size: 100,
+            },
+            user_data: "123"
+        }
+        return timRenderInstance.TIMMsgSearchCloudMessages(param);
+    },
     func1:(data:string,user_data:string)=>{
         // console.log(args);
         // const [data,user_data] = args;
         total++;
         console.log(`一共收到${total}条消息`)
+        console.log(data)
     },
     func2:(...args) =>{
         console.log("in function2");
@@ -311,12 +388,12 @@ const advanceMessageManager = {
             callback: advanceMessageManager.func1,
             user_data: "func1"
         }
-        return timRenderInstance.TIMAddRecvNewMsgCallback(param);
-        // let param2 : TIMRecvNewMsgCallbackParams = {
-        //     callback: advanceMessageManager.func2,
-        //     user_data: "TIMAddRecvNewMsgCallback"
-        // }
-        // return timRenderInstance.TIMAddRecvNewMsgCallback(param2);
+        timRenderInstance.TIMAddRecvNewMsgCallback(param);
+        let param2 : TIMRecvNewMsgCallbackParams = {
+            callback: advanceMessageManager.func2,
+            user_data: "TIMAddRecvNewMsgCallback"
+        }
+        return timRenderInstance.TIMAddRecvNewMsgCallback(param2);
     },
     TIMRemoveRecvNewMsgCallback:(callback) => {
         // return timRenderInstance.TIMRemoveRecvNewMsgCallback({
@@ -332,7 +409,7 @@ const advanceMessageManager = {
             callback:advanceMessageManager.func1,
             user_data: "TIMAddRecvNewMsgCallback"
         }
-        return timRenderInstance.TIMRemoveRecvNewMsgCallback(param)
+        return timRenderInstance.TIMRemoveRecvNewMsgCallback()
     },
     TIMSetMsgReadedReceiptCallback:(callback) => {
         let param :TIMMsgReadedReceiptCallbackParams = {
@@ -468,6 +545,16 @@ const advanceMessageManager = {
             language:"zh"
         }
         return timRenderInstance.TIMMsgConvertVoiceToText(param);
+    },
+    TIMMsgSetLocalCustomData:async()=>{
+        var message = await advanceMessageManager.TIMMsgGetMsgList(null);
+        let m = message.json_params[0];
+        m.message_custom_str = "hello here";
+        let param:SetLocalCustomDataParam={
+            json_msg_param: m,
+            user_data: ""
+        }
+        return timRenderInstance.TIMMsgSetLocalCustomData(param);
     }
 }
 

@@ -1,4 +1,8 @@
-import { GroupMemberInfo } from "./groupInterface";
+import {
+    GroupMemberInfo,
+    GroupTipGroupChangeInfo,
+    GroupTipMemberChangeInfo,
+} from "./groupInterface";
 import {
     TIMPlatform,
     TIMMsgStatus,
@@ -178,6 +182,62 @@ interface CustomElem {
     custom_elem_desc: string; // 读写, 自定义描述
     custom_elem_ext: string; // 读写, 后台推送对应的ext字段
     custom_elem_sound: string; // 读写, 自定义声音
+}
+
+/**
+ * @brief 群组系统通知元素
+ * @param group_report_elem_report_type 只读, 类型 [TIMGroupReportType]
+ * @param group_report_elem_group_id 只读, 群组ID
+ * @param group_report_elem_op_user 只读, 操作者ID
+ * @param group_report_elem_msg 只读, 操作理由
+ * @param group_report_elem_user_data 只读, 操作者填的自定义数据
+ * @param group_report_elem_op_user_info 只读, 操作者个人资料
+ * @param group_report_elem_op_group_memberinfo 只读, 操作者群内资料
+ * @param group_report_elem_platform 只读, 操作方平台信息
+ * @param group_report_elem_shut_up_time 读, 被操作者的禁言时间(禁言某些用户时，被禁言的用户会收到该信息)
+ * @param group_report_elem_group_message_receive_option 只读，消息接收选项, 用户修改群消息接收选项时会收到该信息[TIMReceiveMessageOpt]
+ */
+interface GroupReportElem {
+    group_report_elem_report_type: number;
+    group_report_elem_group_id: string;
+    group_report_elem_op_user: string;
+    group_report_elem_msg: string;
+    group_report_elem_user_data: string;
+    group_report_elem_op_user_info: userProfile;
+    group_report_elem_op_group_memberinfo: GroupMemberInfo;
+    group_report_elem_platform: string;
+    group_report_elem_shut_up_time: number;
+    group_report_elem_group_message_receive_option: TIMReceiveMessageOpt;
+}
+
+/**
+ * @param group_tips_elem_tip_type [TIMGroupTipType](), 只读, 群消息类型
+ * @param group_tips_elem_op_user 只读, 操作者ID
+ * @param group_tips_elem_group_id 只读, 群组ID
+ * @param group_tips_elem_user_array 只读, 被操作的账号列表
+ * @param group_tips_elem_group_change_info_array  只读, 只读, 群资料变更信息列表,仅当 kTIMGroupTipsElemTipType 值为 kTIMGroupTip_GroupInfoChange 时有效
+ * @param group_tips_elem_member_change_info_array  只读, 群成员变更信息列表,仅当 kTIMGroupTipsElemTipType 值为 kTIMGroupTip_MemberInfoChange 时有效
+ * @param group_tips_elem_op_user_info  只读, 操作者个人资料
+ * @param group_tips_elem_op_group_memberinfo  只读, 群成员信息
+ * @param group_tips_elem_changed_user_info_array  只读, 被操作的用户资料列表
+ * @param group_tips_elem_member_num  只读, 只读, 当前群成员数,只有当事件消息类型为 kTIMGroupTip_Invite 、 kTIMGroupTip_Quit 、 kTIMGroupTip_Kick 时有效
+ * @param group_tips_elem_platform  只读, 操作方平台信息
+ * @param group_tips_elem_member_mark_info_array  只读, 群成员标记信息列表,仅当 kTIMGroupTipsElemTipType 值为 kTIMGroupTip_MemberMarkChange 时有效
+ */
+interface GroupTipsElem {
+    group_tips_elem_tip_type: number;
+    group_tips_elem_op_user: string;
+    group_tips_elem_group_id: string;
+    group_tips_elem_user_array: string[];
+    group_tips_elem_group_change_info_array: GroupTipGroupChangeInfo[];
+    group_tips_elem_member_change_info_array: GroupTipMemberChangeInfo[];
+    group_tips_elem_op_user_info: userProfile;
+    group_tips_elem_op_group_memberinfo: GroupMemberInfo;
+    group_tips_elem_changed_user_info_array: userProfile[];
+    group_tips_elem_changed_group_memberinfo_array: GroupMemberInfo[];
+    group_tips_elem_member_num: number;
+    group_tips_elem_platform: string;
+    group_tips_elem_member_mark_info_array: GroupTipMemberChangeInfo[];
 }
 
 /**
@@ -462,14 +522,14 @@ interface MsgSetGroupReceiveMessageOptParams {
 /**
  * @param params  params：json_download_elem_param下载的参数Json字符串
  * @param path path 下载文件保存路径
- * @param user_data user_data 用户自定义数据，ImSDK只负责传回给回调函数cb，不做任何处理
+ * @param user_data user_data 用户自定义数据，ImSDK只负责传回给回调函数cb，不做任何处理.不同的下载需要设置不同的user_data
  *
  */
 interface MsgDownloadElemToPathParams {
     params: Json_download_elem_param;
     path: string;
     callback: TIMMsgDownloadElemToPathFunc;
-    user_data?: string;
+    user_data: string;
 }
 /**
  * @param params  params： 单条消息的 JSON 字符串，接收消息、查找消息或查询历史消息时获取到的消息
@@ -568,6 +628,8 @@ interface Json_value_msg {
         | ElemMergerElem
         | ElemFaceElem
         | ElemLocationElem
+        | ElemGroupTipsElem
+        | ElemGroupReportElem
     )[];
     message_conv_id?: string;
     message_conv_type?: number;
@@ -909,6 +971,14 @@ interface ElemLocationElem extends LocationElem {
     elem_type: number;
 }
 
+interface ElemGroupReportElem extends GroupReportElem {
+    elem_type: number;
+}
+
+interface ElemGroupTipsElem extends GroupTipsElem {
+    elem_type: number;
+}
+
 interface C2CRecvMsgOptResult {
     msg_recv_msg_opt_result_identifier: string;
     msg_recv_msg_opt_result_opt: TIMReceiveMessageOpt;
@@ -1029,7 +1099,14 @@ interface ConvertVoiceToTextParam {
     language: string;
     user_data?: string;
 }
-
+/**
+ * @param json_msg_param 消息json
+ * @param user_data 用户自定义数据，ImSDK只负责传回给回调函数cb，不做任何处理
+ */
+interface SetLocalCustomDataParam {
+    json_msg_param: Json_value_msg;
+    user_data: string;
+}
 export {
     TIMMsgDeleteMessageExtensionsParam,
     TIMMsgGetMessageExtensionsParam,
@@ -1079,6 +1156,7 @@ export {
     TranslateTextParam,
     ConvertVoiceToTextParam,
     MessageTranslateTextResult,
+    SetLocalCustomDataParam,
     // 文档需要导出，外部不使用这些inreface
     ImageElem,
     TextElem,

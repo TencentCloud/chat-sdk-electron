@@ -2,6 +2,7 @@
  * 如果您需要收发图片、视频、文件等富媒体消息，并需要撤回消息、标记已读、查询历史消息等高级功能，推荐使用下面这套高级消息接口（简单消息接口和高级消息接口请不要混用）。
  * @module advanceMessageManager(高级消息收发接口)
  */
+import { createPointer, unwrapPointer } from "ffi-rs";
 import {
     sdkconfig,
     MsgSendMessageParams,
@@ -24,7 +25,6 @@ import {
     MsgDownloadMergerMessageParams,
     MsgBatchSendParams,
     MsgSearchLocalMessagesParams,
-    cache,
     commonResult,
 } from "../interface";
 import {
@@ -49,19 +49,17 @@ import {
     TranslateTextParam,
     ConvertVoiceToTextParam,
     MessageTranslateTextResult,
+    TIMRecvNewMsgCallbackFunc,
+    SetLocalCustomDataParam,
 } from "../interface/advanceMessageInterface";
 
-const {
-    load,
-    DataType,
-
-    funcConstructor,
-} = require("ffi-rs");
+const { load, DataType, funcConstructor } = require("ffi-rs");
 const libName = "libImSDK";
 
 class AdvanceMessageManage {
     private _sdkconfig: sdkconfig;
-
+    static _recvNewMessageCallback: unknown[];
+    static _callback: TIMRecvNewMsgCallbackFunc;
     setSDKAPPID(sdkappid: number) {
         this._sdkconfig.sdkappid = sdkappid;
     }
@@ -977,7 +975,7 @@ class AdvanceMessageManage {
         return new Promise((resolve, reject) => {
             const code = load({
                 library: libName,
-                funcName: "TIMMsgListDelete",
+                funcName: "TIMMsgClearHistoryMessage",
                 retType: DataType.I32,
                 paramsType: [
                     DataType.String,
@@ -1286,7 +1284,7 @@ class AdvanceMessageManage {
         return new Promise((resolve, reject) => {
             const code = load({
                 library: libName,
-                funcName: "TIMMsgDownloadMergerMessage",
+                funcName: "TIMMsgBatchSend",
                 retType: DataType.I32,
                 paramsType: [
                     DataType.String,
@@ -1421,21 +1419,43 @@ class AdvanceMessageManage {
      */
     TIMAddRecvNewMsgCallback(params: TIMRecvNewMsgCallbackParams): void {
         const { callback, user_data = "" } = params;
-        this.TIMRemoveRecvNewMsgCallback();
+        console.log(
+            `in addrecvNewMsg ${AdvanceMessageManage._recvNewMessageCallback}`
+        );
+        if (AdvanceMessageManage._recvNewMessageCallback != undefined) {
+            console.log("pointer is not undefined");
+            this.TIMRemoveRecvNewMsgCallback();
+        }
+        // if(AdvanceMessageManage._callback != undefined){
+        //     this.TIMRemoveRecvNewMsgCallback()
+        // }
+        // create pointer
+        AdvanceMessageManage._recvNewMessageCallback = createPointer({
+            paramsType: [
+                funcConstructor({
+                    paramsType: [DataType.String, DataType.String],
+                    returnType: DataType.Void,
+                    permanent: true,
+                }),
+            ],
+            paramsValue: [callback],
+        });
+        const ptr = AdvanceMessageManage._recvNewMessageCallback[0];
         load({
             library: libName,
             funcName: "TIMAddRecvNewMsgCallback",
             retType: DataType.Void,
             paramsType: [
-                callback == null
-                    ? DataType.Void
-                    : funcConstructor({
-                          paramsType: [DataType.String, DataType.String],
-                          permanent: true,
-                      }),
+                callback == null ? DataType.Void : DataType.External,
+                // funcConstructor({
+                //       paramsType: [DataType.String, DataType.String],
+                //       returnType: DataType.Void,
+                //       permanent: true,
+                //   }),
+                // DataType.External,
                 DataType.String,
             ],
-            paramsValue: [callback, user_data],
+            paramsValue: [unwrapPointer([ptr])[0], user_data],
         });
     }
 
@@ -1458,13 +1478,19 @@ class AdvanceMessageManage {
         load({
             library: libName,
             funcName: "TIMMsgDownloadElemToPath",
-            retType: DataType.Void,
+            retType: DataType.I32,
             paramsType: [
                 DataType.String,
                 DataType.String,
                 funcConstructor({
-                    paramsType: [DataType.String, DataType.String],
+                    paramsType: [
+                        DataType.I32,
+                        DataType.String,
+                        DataType.String,
+                        DataType.String,
+                    ],
                     permanent: true,
+                    retType: DataType.Void,
                 }),
                 DataType.String,
             ],
@@ -1705,14 +1731,38 @@ class AdvanceMessageManage {
      * @category 高级消息相关回调(callback)
      * @note 参数cb需要跟TIMAddRecvNewMsgCallback传入的cb一致，否则删除回调失败
      */
-    TIMRemoveRecvNewMsgCallback(): void {
-        load({
-            library: libName,
-            funcName: "TIMRemoveRecvNewMsgCallback",
-            retType: DataType.Void,
-            paramsType: [],
-            paramsValue: [],
-        });
+    TIMRemoveRecvNewMsgCallback(callback?: TIMRecvNewMsgCallbackFunc): void {
+        // let c = callback!== undefined ? callback : AdvanceMessageManage._recvNewMessageCallback;
+        if (callback == undefined) {
+            console.log("in undefined");
+            console.log(
+                `is pointer undefined? ${
+                    AdvanceMessageManage._recvNewMessageCallback == undefined
+                }`
+            );
+            let ptr = AdvanceMessageManage._recvNewMessageCallback[0];
+            load({
+                library: libName,
+                funcName: "TIMRemoveRecvNewMsgCallback",
+                retType: DataType.Void,
+                paramsType: [DataType.External],
+                paramsValue: [unwrapPointer([ptr])[0]],
+            });
+        } else {
+            load({
+                library: libName,
+                funcName: "TIMRemoveRecvNewMsgCallback",
+                retType: DataType.Void,
+                paramsType: [
+                    funcConstructor({
+                        paramsType: [DataType.String, DataType.String],
+                        returnType: DataType.Void,
+                        permanent: true,
+                    }),
+                ],
+                paramsValue: [callback],
+            });
+        }
     }
     /**
      * ### 设置消息已读回执回调
@@ -1815,7 +1865,6 @@ class AdvanceMessageManage {
      */
     TIMSetMsgUpdateCallback(params: TIMMsgUpdateCallbackParams): void {
         const { callback, user_data = "" } = params;
-
         load({
             library: libName,
             funcName: "TIMSetMsgUpdateCallback",
@@ -1988,6 +2037,118 @@ class AdvanceMessageManage {
                 paramsValue: [
                     url,
                     language,
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+
+    TIMMsgSearchCloudMessages(
+        param: MsgSearchLocalMessagesParams
+    ): Promise<commonResult<MessageSearchResult>> {
+        const { params, user_data } = param;
+
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMMsgSearchCloudMessages",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(params),
+                    (...args: any) => {
+                        const [code, desc, json_param, user_data] = args;
+                        if (code == 0) {
+                            let param: MessageSearchResult;
+                            try {
+                                param = JSON.parse(
+                                    json_param.trim().length > 0
+                                        ? json_param.trim()
+                                        : JSON.stringify({})
+                                );
+                            } catch {
+                                param = {} as MessageSearchResult;
+                            }
+                            resolve({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: param,
+                                user_data,
+                            });
+                        } else {
+                            reject({
+                                code,
+                                desc,
+                                json_param,
+                                json_params: json_param,
+                                user_data,
+                            });
+                        }
+                    },
+                    user_data ?? "",
+                ],
+            });
+            code !== 0 && reject({ code });
+        });
+    }
+    TIMMsgSetLocalCustomData(
+        param: SetLocalCustomDataParam
+    ): Promise<commonResult<string>> {
+        const { json_msg_param, user_data } = param;
+        return new Promise((resolve, reject) => {
+            const code = load({
+                library: libName,
+                funcName: "TIMMsgSetLocalCustomData",
+                retType: DataType.I32,
+                paramsType: [
+                    DataType.String,
+                    funcConstructor({
+                        paramsType: [
+                            DataType.I32,
+                            DataType.String,
+                            DataType.String,
+                            DataType.String,
+                        ],
+                        retType: DataType.Void,
+                    }),
+                    DataType.String,
+                ],
+                paramsValue: [
+                    JSON.stringify(json_msg_param),
                     (...args: any) => {
                         const [code, desc, json_param, user_data] = args;
                         if (code == 0) {

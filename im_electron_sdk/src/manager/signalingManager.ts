@@ -95,7 +95,7 @@ class SignalingManager {
             const code = load({
                 library: libName,
                 funcName: "TIMSignalingInviteInGroup",
-                retType: DataType.String,
+                retType: DataType.I32,
                 paramsType: [
                     DataType.String,
                     DataType.String,

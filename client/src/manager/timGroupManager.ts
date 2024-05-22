@@ -1,5 +1,5 @@
 import TimRender from "../../../im_electron_sdk/dist/renderer";
-import { CreateGroupParams, CreateTopicParam, DeleteAttributeParams, DeleteGroupParams, DeleteMemberParams, DeleteTopicParam, GetCommunityListParam, GetGroupCounterParams, GetGroupListParams, GetGroupMemberInfoParams, GetOnlineMemberCountParams, GetPendencyListParams, GroupAttributeCallbackParams, GroupCounterChangedParam, GroupCounterParams, GroupTipsCallbackParams, GroupTopicInfo, HandlePendencyParams, IncreaseGroupCounterParam, InitGroupAttributeParams, InviteMemberParams, JoinGroupParams, ModifyGroupParams, ModifyMemberInfoParams, MsgGetGroupMessageReadMembersParam, MsgGetGroupMessageReceiptsParam, MsgGetMsgListParams, MsgSendGroupMessageReceiptsParam, QuitGroupParams, ReportParams, ReportPendencyReadedParams, SearchGroupParams, SearchMemberParams, SetTopicInfoParam, TopicCreatedParam } from "../../../im_electron_sdk/dist/interfaces";
+import { CreateGroupParams, CreateTopicParam, DeleteAttributeParams, DeleteGroupParams, DeleteMemberParams, DeleteTopicParam, GetCommunityListParam, GetGroupCounterParams, GetGroupListParams, GetGroupMemberInfoParams, GetOnlineMemberCountParams, GetPendencyListParams, GroupAttributeCallbackParams, GroupCounterChangedParam, GroupCounterParams, GroupSearchParams, GroupTipsCallbackParams, GroupTopicInfo, HandlePendencyParams, IncreaseGroupCounterParam, InitGroupAttributeParams, InviteMemberParams, JoinGroupParams, ModifyGroupParams, ModifyMemberInfoParams, MsgGetGroupMessageReadMembersParam, MsgGetGroupMessageReceiptsParam, MsgGetMsgListParams, MsgSendGroupMessageReceiptsParam, QuitGroupParams, ReportParams, ReportPendencyReadedParams, SearchGroupParams, SearchMemberParams, SetTopicInfoParam, TopicCreatedParam } from "../../../im_electron_sdk/dist/interfaces";
 // import TimRender from "im_electron_sdk/dist/renderer";
 const timRenderInstance = new TimRender();
 const TimBaseManager = {
@@ -100,7 +100,7 @@ const TimBaseManager = {
    async TIMMsgGetMessageReadReceipts(){
     let obj1 : MsgGetMsgListParams = {
       // conv_id: "@TGS#14Q5ONCJC",
-      conv_id: "@TGS#1DS5WDSOBM",
+      conv_id: "@TGS#1CNQDDUML",
        conv_type: 2,
        params: {
           //  msg_getmsglist_param_last_msg: "",
@@ -147,7 +147,7 @@ const TimBaseManager = {
   },
   TIMGroupGetGroupInfoList: () => {
     let param : GetGroupListParams = {
-      groupIds: ["@TGS#14Q5ONCJC"],
+      groupIds: ["@TGS#1M456E6IM"],
       data: 'test data'
     }
     return timRenderInstance.TIMGroupGetGroupInfoList(param)
@@ -281,9 +281,9 @@ const TimBaseManager = {
   },
   TIMGroupJoin: () => {
     let param : JoinGroupParams = {
-      groupId: '@TGS#2WPDHLWH6',
+      groupId: '@TGS#_@TGS#cCVFSIIM62CS',
       helloMsg: 'hello',
-      data: 'test data'
+      data: ''
     }
     return timRenderInstance.TIMGroupJoin(param)
   },
@@ -302,11 +302,12 @@ const TimBaseManager = {
     return timRenderInstance.TIMGroupGetOnlineMemberCount(param)
   },
   TIMGroupSearchGroups: () => {
+    let search:GroupSearchParams = {
+      group_search_params_keyword_list: ['Unity世界'],
+      group_search_params_field_list: [0x01,0x01<<1]
+    }
     let param : SearchGroupParams={
-      searchParams: {
-        group_search_params_keyword_list: ['test'],
-        group_search_params_field_list: [2]
-      },
+      searchParams: search,
       data: 'test data'
     }
     return timRenderInstance.TIMGroupSearchGroups(param)

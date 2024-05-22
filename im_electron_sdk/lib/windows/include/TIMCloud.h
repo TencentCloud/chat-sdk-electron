@@ -3,6 +3,7 @@
 #ifndef SRC_PLATFORM_CROSS_PLATFORM_INCLUDE_TIM_CLOUD_H_
 #define SRC_PLATFORM_CROSS_PLATFORM_INCLUDE_TIM_CLOUD_H_
 
+#include "TIMCommunityManager.h"
 #include "TIMConversationManager.h"
 #include "TIMErrorCode.h"
 #include "TIMExperimentalAPI.h"
